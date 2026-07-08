@@ -1,0 +1,203 @@
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Setting {
+  id                         Int      @id @default(1)
+  siteName                   String
+  siteSubtitle               String   @db.Text
+  primaryColor               String
+  themeMode                  String
+  contactFacebook            String
+  contactDiscord             String
+  contactLine                String
+  truewalletPhone            String
+  bankAccountNumber          String?
+  bankAccountName            String?
+  bankName                   String?
+  qrSlipToken                String
+  botCfTurnstileKey          String
+  discordClientId            String
+  discordClientSecret        String
+  banners                    String   @db.Text // JSON string of banners array
+  allowAngpao                Boolean
+  allowQr                    Boolean
+  siteLogoUrl                String?  @db.Text
+  siteBackgroundUrl          String?  @db.Text
+  announcementActive         Boolean?
+  announcementTitle          String?
+  announcementBody           String?  @db.Text
+  announcementImageUrl       String?  @db.Text
+  announcementBarActive      Boolean?
+  announcementBarText        String?  @db.Text
+  announcementBarBgColor     String?
+  announcementBarTextColor   String?
+  announcementBarSpeed       Float?
+  announcementBarStyle       String?
+  announcementBarPrefix      String?
+  announcementFloatActive    Boolean?
+  announcementFloatText      String?  @db.Text
+  announcementFloatStyle     String?
+  announcementFloatIcon      String?
+  announcementFloatPosition  String?
+  maintenanceActive          Boolean?
+  maintenanceTitle           String?
+  maintenanceMessage         String?  @db.Text
+  maintenanceEstimatedTime   String?
+  maintenanceAutoOpenTime    String?
+  serverTime                 Float?
+  aboutUsTitle               String?
+  aboutUsBody                String?  @db.Text
+  aboutUsImageUrl            String?  @db.Text
+  portfolios                 String?  @db.LongText // JSON string of portfolios array
+  artisans                   String?  @db.LongText // JSON string of artisans array
+  landmarks                  String?  @db.LongText // JSON string of landmarks array
+  recommendActive            Boolean?
+  recommendTitle             String?
+  recommendSubtitle          String?
+  recommendProductIds        String?  @db.Text // JSON string of recommended IDs
+  seasonalEffect             String?
+  recentOrdersActive         Boolean?
+  recentOrdersStyle          String?
+  recentOrdersSpeed          String?
+}
+
+model Category {
+  id          String @id
+  name        String
+  description String @db.Text
+  icon        String
+  imageUrl    String @db.Text
+}
+
+model Product {
+  id          String   @id
+  categoryId  String
+  name        String   @db.Text
+  price       Float
+  description String   @db.LongText
+  imageUrl    String   @db.Text
+  stock       String   @db.LongText // JSON string of stock array
+  timesSold   Int
+  details     String   @db.LongText
+  type        String
+  videoUrl    String?  @db.Text
+  boxItems    String?  @db.LongText // JSON string of BoxItem array
+  sellerId    String?
+  sellerName  String?
+  sellerType  String?
+}
+
+model User {
+  id                  String  @id
+  username            String
+  email               String
+  balance             Float
+  role                String
+  discordId           String?
+  avatarUrl           String? @db.Text
+  password            String?
+  pendingBalance      Float?
+  withdrawableBalance Float?
+}
+
+model Coupon {
+  code            String @id
+  discountPercent Float
+  discountBaht    Float
+  usesLeft        Int
+}
+
+model Transaction {
+  id              String  @id
+  userId          String
+  username        String
+  type            String
+  amount          Float
+  details         String  @db.Text
+  status          String
+  date            String
+  shippingDetails String? @db.LongText // JSON string of shippingDetails
+  orderStatus     String?
+  trackingNumber  String?
+  trackingCarrier String?
+  statusUpdates   String? @db.LongText // JSON string of statusUpdates
+}
+
+model Review {
+  id          String @id
+  userId      String
+  username    String
+  rating      Int
+  productId   String
+  productName String @db.Text
+  comment     String @db.Text
+  date        String
+}
+
+model SellerVerification {
+  id             String  @id
+  userId         String
+  username       String
+  shopName       String
+  contactDetails String  @db.Text
+  status         String
+  createdAt      String
+  reviewedAt     String?
+  reviewerNotes  String? @db.Text
+}
+
+model Withdrawal {
+  id              String  @id
+  userId          String
+  username        String
+  amount          Float
+  bankName        String
+  bankAccount     String
+  bankAccountName String
+  status          String
+  createdAt       String
+  reviewedAt      String?
+  reviewerNotes   String? @db.Text
+}
+
+model Conversation {
+  id            String @id
+  customerId    String
+  sellerId      String
+  shopId        String
+  lastMessage   String @db.Text
+  lastMessageAt String
+  status        String
+  createdAt     String
+}
+
+model Message {
+  id             String  @id
+  conversationId String
+  senderId       String
+  message        String  @db.LongText
+  messageType    String
+  image          String? @db.Text
+  isRead         Boolean
+  createdAt      String
+  replyToId      String?
+  replyToMessage String? @db.Text
+  productInfo    String? @db.LongText // JSON string
+  orderInfo      String? @db.LongText // JSON string
+  locationInfo   String? @db.LongText // JSON string
+}
+
+model Notification {
+  id        String  @id
+  userId    String
+  title     String
+  body      String  @db.Text
+  isRead    Boolean
+  createdAt String
+}

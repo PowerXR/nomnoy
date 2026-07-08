@@ -1,0 +1,71 @@
+@import url('https://fonts.googleapis.com/css2?family=Anuphan:wght@300;400;500;600;700&family=Prompt:wght@300;400;500;600;700;800&family=Cinzel:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,400;0,500;0,600;0,700;1,400&family=Noto+Serif+Thai:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Anuphan", "Prompt", ui-sans-serif, system-ui, sans-serif;
+  --font-serif: "Playfair Display", "Cinzel", "Noto Serif Thai", serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
+}
+
+html, body {
+  background-color: #FCFAF7 !important;
+  color: #2E2520 !important;
+  font-family: "Anuphan", "Prompt", ui-sans-serif, system-ui, sans-serif;
+  scroll-behavior: smooth;
+}
+
+.dark html, .dark body {
+  background-color: #0B0908 !important;
+  background-image: radial-gradient(circle at 0% 0%, rgba(142, 109, 78, 0.08) 0%, transparent 35%),
+                    radial-gradient(circle at 100% 100%, rgba(142, 109, 78, 0.08) 0%, transparent 35%),
+                    radial-gradient(circle at 50% 30%, rgba(20, 17, 15, 1) 0%, rgba(11, 9, 8, 1) 100%) !important;
+  color: #F4EFEA !important;
+}
+
+/* Custom scrollbars for high luxury aesthetic */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #F9F6F0;
+}
+.dark ::-webkit-scrollbar-track {
+  background: #12100E;
+}
+::-webkit-scrollbar-thumb {
+  background: #D3C3B1;
+  border-radius: 999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #8E6D4E;
+}
+
+/* Premium theme cross-fade using View Transitions API custom styling */
+::view-transition-old(root) {
+  animation: 350ms cubic-bezier(0.4, 0, 0.2, 1) both fade-out;
+}
+::view-transition-new(root) {
+  animation: 350ms cubic-bezier(0.4, 0, 0.2, 1) both fade-in;
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Fallback smooth transitions for all elements when changing theme */
+.theme-transitioning,
+.theme-transitioning * {
+  transition: background-color 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              text-shadow 350ms cubic-bezier(0.4, 0, 0.2, 1),
+              opacity 350ms cubic-bezier(0.4, 0, 0.2, 1) !important;
+}
