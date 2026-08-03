@@ -116,8 +116,8 @@ export const translations = {
     emptyArtisans: "ยังไม่มีข้อมูลในทำเนียบช่างฝีมือขณะนี้",
     statsSystem: "ระบบวิสาหกิจและภูมิปัญญาสัมมาชีพ",
     statsQuestion: "ติดตามช่องทาง Social Nomnoy Community",
-    statsBody: "ตำบลน้ำน้อย อำเภอหาดใหญ่ เปิดต้อนรับการศึกษาดูงานจากโรงเรียน สถาบันอุดมศึกษา และนักท่องเที่ยวเชิงอนุรักษ์ทุกท่าน โดยกลุ่มทอผ้าบาติกและจักสานใบลานของเราจัดคลาสเวิร์กชอปสาธิตฟรีโดยไม่มีค่าใช้จ่ายเพิ่มเติม",
-    statsReserveBtn: "จองคิวศึกษาดูงานฟรี",
+    statsBody: "ตำบลน้ำน้อย อำเภอหาดใหญ่ ",
+    statsReserveBtn: "Facebook",
     statsLocBtn: "แชร์พิกัดนำทางตำบล",
 
     // Product Detail and Checkout Form Additions
