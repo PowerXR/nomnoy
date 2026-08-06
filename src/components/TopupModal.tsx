@@ -309,15 +309,14 @@ export default function TopupModal({
                   onClick={handleCopyBank}
                   className="flex-grow flex items-center justify-between p-3.5 rounded-xl bg-[#FAF7F2] dark:bg-[#1C1815] border border-[#8E6D4E]/20 hover:bg-stone-50 transition-all group cursor-pointer text-left"
                 >
-<div className="flex items-center gap-3">
-  <div className="w-10 h-10 rounded-full border border-emerald-500/30 bg-white flex items-center justify-center shrink-0 shadow-sm">
-    <img
-      src="/images/bangkok-bank.png.png"
-      alt="ธนาคารกรุงเทพ"
-      className="w-5 h-5 object-contain"
-    />
-  </div>
-</div>
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full border border-emerald-500/30 bg-white flex items-center justify-center shrink-0 shadow-sm">
+                      <svg viewBox="0 0 100 100" className="w-5 h-5 stroke-[#138044] stroke-[13] fill-none" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M50 15 L50 85" />
+                        <path d="M25 45 L50 25 L75 45" />
+                        <path d="M25 65 L50 45 L75 65" />
+                      </svg>
+                    </div>
 
                     <div className="space-y-0.5">
                       <div className="flex items-center gap-1.5">
