@@ -3,6 +3,7 @@ import { Coins, Sun, Moon, LogOut, Settings, LayoutDashboard, UserPlus, LogIn, M
 import { User, AppSettings } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { Language, getTranslation } from "../lib/translations";
+import AccessibilityControls from "./AccessibilityControls";
 
 interface HeaderProps {
   user: User | null;
@@ -136,7 +137,7 @@ export default function Header({
               )}
             </AnimatePresence>
           </div>
-
+          <AccessibilityControls />
           {/* Theme Toggler (Hidden on Mobile, handled inside mobile menu) */}
           <button 
             id="theme-toggler"
