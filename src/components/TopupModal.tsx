@@ -311,11 +311,11 @@ export default function TopupModal({
                 >
                   <div className="flex items-center gap-3">
                     <div className="w-10 h-10 rounded-full border border-emerald-500/30 bg-white flex items-center justify-center shrink-0 shadow-sm">
-                      <svg viewBox="0 0 100 100" className="w-5 h-5 stroke-[#138044] stroke-[13] fill-none" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M50 15 L50 85" />
-                        <path d="M25 45 L50 25 L75 45" />
-                        <path d="M25 65 L50 45 L75 65" />
-                      </svg>
+<img
+  src="/images/bangkok-bank.png.png"
+  alt="ธนาคารกรุงเทพ"
+  className="w-5 h-5 object-contain"
+/>
                     </div>
 
                     <div className="space-y-0.5">
