@@ -328,7 +328,7 @@ export default function TopupModal({
                         </span>
                       </div>
                       <p className="text-[11px] text-stone-500 dark:text-stone-400 font-medium">
-                        {settings.bankAccountName || "ธนกฤต ชูกำเนิด"}
+                        {settings.bankAccountName || "ธนกฤต ชูกำเนิด ( ธนาคารกรุงเทพ )"}
                       </p>
                     </div>
                   </div>
