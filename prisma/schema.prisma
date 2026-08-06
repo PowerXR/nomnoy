@@ -55,9 +55,9 @@ model Setting {
   aboutUsTitle               String?
   aboutUsBody                String?  @db.Text
   aboutUsImageUrl            String?  @db.Text
-  portfolios                 String?  @db.LongText // JSON string of portfolios array
-  artisans                   String?  @db.LongText // JSON string of artisans array
-  landmarks                  String?  @db.LongText // JSON string of landmarks array
+  portfolios                 String?  @db.Text // JSON string of portfolios array
+  artisans                   String?  @db.Text // JSON string of artisans array
+  landmarks                  String?  @db.Text // JSON string of landmarks array
   recommendActive            Boolean?
   recommendTitle             String?
   recommendSubtitle          String?
@@ -81,14 +81,14 @@ model Product {
   categoryId  String
   name        String   @db.Text
   price       Float
-  description String   @db.LongText
+  description String   @db.Text
   imageUrl    String   @db.Text
-  stock       String   @db.LongText // JSON string of stock array
+  stock       String   @db.Text // JSON string of stock array
   timesSold   Int
-  details     String   @db.LongText
+  details     String   @db.Text
   type        String
   videoUrl    String?  @db.Text
-  boxItems    String?  @db.LongText // JSON string of BoxItem array
+  boxItems    String?  @db.Text // JSON string of BoxItem array
   sellerId    String?
   sellerName  String?
   sellerType  String?
@@ -123,11 +123,11 @@ model Transaction {
   details         String  @db.Text
   status          String
   date            String
-  shippingDetails String? @db.LongText // JSON string of shippingDetails
+  shippingDetails String? @db.Text // JSON string of shippingDetails
   orderStatus     String?
   trackingNumber  String?
   trackingCarrier String?
-  statusUpdates   String? @db.LongText // JSON string of statusUpdates
+  statusUpdates   String? @db.Text // JSON string of statusUpdates
 }
 
 model Review {
@@ -182,16 +182,16 @@ model Message {
   id             String  @id
   conversationId String
   senderId       String
-  message        String  @db.LongText
+  message        String  @db.Text
   messageType    String
   image          String? @db.Text
   isRead         Boolean
   createdAt      String
   replyToId      String?
   replyToMessage String? @db.Text
-  productInfo    String? @db.LongText // JSON string
-  orderInfo      String? @db.LongText // JSON string
-  locationInfo   String? @db.LongText // JSON string
+  productInfo    String? @db.Text // JSON string
+  orderInfo      String? @db.Text// JSON string
+  locationInfo   String? @db.Text // JSON string
 }
 
 model Notification {
