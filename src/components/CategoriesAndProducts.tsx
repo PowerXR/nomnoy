@@ -83,7 +83,7 @@ export default function CategoriesAndProducts({
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#8E6D4E]/5 rounded-full blur-2xl pointer-events-none" />
           <div className="relative w-full sm:w-56 aspect-[4/5] overflow-hidden rounded-[1.75rem] bg-stone-900 flex-shrink-0 border-2 border-white/90 shadow-lg group-hover:scale-[1.02] transition-transform duration-500">
             <img 
-               src="https://images.unsplash.com/photo-1590736969955-71cc94801759?auto=format&fit=crop&w=500&q=80" 
+               src="https://img2.pic.in.th/80075315-4ddf-4fc6-b96f-4fb9f798bb55.png" 
               alt="Artisan weaving textile" 
               className="w-full h-full object-cover group-hover:scale-105 transition-all duration-700"
             />
