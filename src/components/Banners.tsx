@@ -147,9 +147,9 @@ export default function Banners({ settings }: BannersProps) {
             <Feather size={18} />
           </div>
           <div>
-            <span className="font-serif text-stone-400 text-[10px] block font-semibold tracking-wider">01 / LOCAL ARTISANS</span>
-            <h5 className="text-xs font-bold text-[#4E3B2C] dark:text-[#E2C7A9] mt-0.5">หัตถกรรมถักทอมือ</h5>
-            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">ผ้าบาติกและจักสานชั้นสูง ฝีมือประณีตด้วยอัตลักษณ์ชุมชนน้ำน้อยแท้</p>
+            <span className="font-serif text-stone-400 text-[10px] block font-semibold tracking-wider">01 / LOCAL PRODUCTS</span>
+            <h5 className="text-xs font-bold text-[#4E3B2C] dark:text-[#E2C7A9] mt-0.5">สินค้าชุมชนคัดสรร</h5>
+            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">รวมผลิตภัณฑ์คุณภาพจากคนในตำบลน้ำน้อย โดดเด่นด้วยเอกลักษณ์และความตั้งใจในทุกชิ้น</p>
           </div>
         </div>
         <div className="flex items-start gap-3.5 p-5 rounded-2xl bg-[#FCFAF7] dark:bg-[#1C1815] border border-[#8E6D4E]/10 transition-all hover:border-[#8E6D4E]/20">
@@ -157,9 +157,9 @@ export default function Banners({ settings }: BannersProps) {
             <Sparkles size={18} />
           </div>
           <div>
-            <span className="font-serif text-stone-400 text-[10px] block font-semibold tracking-wider">02 / NATURAL CURES</span>
-            <h5 className="text-xs font-bold text-[#4E3B2C] dark:text-[#E2C7A9] mt-0.5">วิถีเกษตรอินทรีย์</h5>
-            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">เพาะน้ำผึ้งป่าธรรมชาติห้าเดือน และชุดสมุนไพรอบปรุงประทิ่นโฉมสด</p>
+            <span className="font-serif text-stone-400 text-[10px] block font-semibold tracking-wider">02 / NATURAL GOODNESS</span>
+            <h5 className="text-xs font-bold text-[#4E3B2C] dark:text-[#E2C7A9] mt-0.5">คุณค่าจากธรรมชาติ</h5>
+            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">คัดสรรวัตถุดิบท้องถิ่นอย่างพิถีพิถัน เพื่อส่งมอบผลิตภัณฑ์ที่ดีและน่าใช้ในทุกวัน</p>
           </div>
         </div>
         <div className="flex items-start gap-3.5 p-5 rounded-2xl bg-[#FCFAF7] dark:bg-[#1C1815] border border-[#8E6D4E]/10 transition-all hover:border-[#8E6D4E]/20">
@@ -167,9 +167,9 @@ export default function Banners({ settings }: BannersProps) {
             <ShieldCheck size={18} />
           </div>
           <div>
-            <span className="font-serif text-stone-400 text-[10px] block font-semibold tracking-wider">03 / HANDMADE TRADITION</span>
+            <span className="font-serif text-stone-400 text-[10px] block font-semibold tracking-wider">03 / LOCAL WISDOM</span>
             <h5 className="text-xs font-bold text-[#4E3B2C] dark:text-[#E2C7A9] mt-0.5">สืบสานภูมิปัญญา</h5>
-            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">ทุกยอดการสั่งซื้อโอนกระจายรายได้หมุนเวียนกลุ่มเกษตรกรท้องถิ่นเต็มสัดส่วน</p>
+            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">ถ่ายทอดเรื่องราวและฝีมือจากรุ่นสู่รุ่น รักษาเสน่ห์ภูมิปัญญาท้องถิ่นให้คงอยู่</p>
           </div>
         </div>
         <div className="flex items-start gap-3.5 p-5 rounded-2xl bg-[#FCFAF7] dark:bg-[#1C1815] border border-[#8E6D4E]/10 transition-all hover:border-[#8E6D4E]/20">
@@ -177,9 +177,9 @@ export default function Banners({ settings }: BannersProps) {
             <HelpCircle size={18} />
           </div>
           <div>
-            <span className="font-serif text-stone-400 text-[10px] block font-semibold tracking-wider">04 / ECO-SUSTAINABLE</span>
-            <h5 className="text-xs font-bold text-[#4E3B2C] dark:text-[#E2C7A9] mt-0.5">ศูนย์บริการประชาสัมพันธ์</h5>
-            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">ติดต่อสบถามข้อมูลท่องเที่ยว และเรียนรู้ภูมิปัญญาตำบลน้ำน้อยได้ตลอดวัน</p>
+            <span className="font-serif text-stone-400 text-[10px] block font-semibold tracking-wider">04 / FRIENDLY SERVICE</span>
+            <h5 className="text-xs font-bold text-[#4E3B2C] dark:text-[#E2C7A9] mt-0.5">บริการด้วยความใส่ใจ</h5>
+            <p className="text-[10px] text-stone-500 dark:text-stone-400 mt-1 leading-normal">สอบถามข้อมูลสินค้าและการสั่งซื้อได้อย่างสะดวก พร้อมให้คำแนะนำในทุกขั้นตอน</p>
           </div>
         </div>
       </div>
