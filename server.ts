@@ -5,6 +5,22 @@ import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import { AppSettings, Category, Product, User, Coupon, Transaction, Review, BoxItem, Conversation, Message, Notification } from "./src/types";
 import { loadFromPrisma, saveToPrisma } from "./src/lib/prisma-sync";
+import "dotenv/config";
+import { createClient } from "@supabase/supabase-js";
+import { randomUUID } from "node:crypto";
+
+
+const supabaseStorage = createClient(
+  process.env.SUPABASE_URL!,
+  process.env.SUPABASE_SECRET_KEY!,
+  {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false,
+    },
+  }
+);
+
 
 // Database storage setup
 const DB_FILE = path.join(process.cwd(), "db.json");
@@ -337,33 +353,74 @@ async function startServer() {
   app.use("/uploads", express.static(uploadsDir));
 
   // File Upload API endpoint
-  app.post("/api/upload", (req, res) => {
-    try {
-      const { filename, base64Data } = req.body;
-      if (!filename || !base64Data) {
-        return res.status(400).json({ error: "Missing filename or base64Data" });
-      }
+  app.post("/api/upload", async (req, res) => {
+  try {
+    const { filename, base64Data } = req.body;
 
-      let pureBase64 = base64Data;
-      if (base64Data.includes(";base64,")) {
-        pureBase64 = base64Data.split(";base64,").pop();
-      }
-
-      const buffer = Buffer.from(pureBase64, "base64");
-      const ext = path.extname(filename) || ".png";
-      const baseName = path.basename(filename, ext).replace(/[^a-zA-Z0-9]/g, "_");
-      const cleanFileName = `${baseName}_${Date.now()}${ext}`;
-      const filePath = path.join(uploadsDir, cleanFileName);
-
-      fs.writeFileSync(filePath, buffer);
-
-      const fileUrl = `/uploads/${cleanFileName}`;
-      res.json({ url: fileUrl });
-    } catch (err: any) {
-      console.error("Error saving uploaded file:", err);
-      res.status(500).json({ error: err.message || "Failed to upload file" });
+    if (!filename || !base64Data) {
+      return res.status(400).json({
+        error: "Missing filename or base64Data",
+      });
     }
-  });
+
+    const mimeMatch = base64Data.match(
+      /^data:(image\/(?:jpeg|png|webp|gif));base64,/i
+    );
+
+    if (!mimeMatch) {
+      return res.status(400).json({
+        error: "รองรับเฉพาะ JPG, PNG, WEBP และ GIF",
+      });
+    }
+
+    const mimeType = mimeMatch[1].toLowerCase();
+
+    const extensions: Record<string, string> = {
+      "image/jpeg": "jpg",
+      "image/png": "png",
+      "image/webp": "webp",
+      "image/gif": "gif",
+    };
+
+    const pureBase64 = base64Data.split(";base64,").pop();
+    const buffer = Buffer.from(pureBase64, "base64");
+
+    if (buffer.length > 5 * 1024 * 1024) {
+      return res.status(413).json({
+        error: "ขนาดรูปต้องไม่เกิน 5 MB",
+      });
+    }
+
+    const filePath =
+      `products/${randomUUID()}.${extensions[mimeType]}`;
+
+    const { error } = await supabaseStorage.storage
+      .from("product-images")
+      .upload(filePath, buffer, {
+        contentType: mimeType,
+        cacheControl: "3600",
+        upsert: false,
+      });
+
+    if (error) {
+      throw error;
+    }
+
+    const { data } = supabaseStorage.storage
+      .from("product-images")
+      .getPublicUrl(filePath);
+
+    return res.json({
+      url: data.publicUrl,
+    });
+  } catch (error: any) {
+    console.error("Supabase upload error:", error);
+
+    return res.status(500).json({
+      error: error.message || "อัปโหลดรูปไม่สำเร็จ",
+    });
+  }
+});
 
   // --- API ROUTES ---
 
