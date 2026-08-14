@@ -83,7 +83,7 @@ export default function CategoriesAndProducts({
           <div className="absolute top-0 right-0 w-32 h-32 bg-[#8E6D4E]/5 rounded-full blur-2xl pointer-events-none" />
           <div className="relative w-full sm:w-56 aspect-[4/5] overflow-hidden rounded-[1.75rem] bg-stone-900 flex-shrink-0 border-2 border-white/90 shadow-lg group-hover:scale-[1.02] transition-transform duration-500">
             <img 
-               src="https://img1.pic.in.th/images/80a809b1-d2cd-44a4-ba2b-25d3e4726969.jpg" 
+               src="https://jejsohavhhoiwztrdaiz.supabase.co/storage/v1/object/public/product-images/80a809b1-d2cd-44a4-ba2b-25d3e4726969.jpg" 
               alt="Artisan weaving textile" 
               className="w-full h-full object-cover group-hover:scale-105 transition-all duration-700"
             />
