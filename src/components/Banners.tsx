@@ -55,7 +55,7 @@ export default function Banners({ settings }: BannersProps) {
       <div
         className="
           relative
-          h-[650px]
+          h-[560px]
           sm:h-[580px]
           lg:h-[580px]
           w-full
@@ -92,11 +92,10 @@ export default function Banners({ settings }: BannersProps) {
                 absolute
                 inset-0
                 bg-cover
-                bg-[position:68%_center]
-                sm:bg-[position:62%_center]
-                md:bg-center
+                bg-[position:72%_center]
+                sm:bg-center
                 scale-100
-                md:scale-105
+                sm:scale-105
                 transition-all
                 duration-1000
               "
@@ -115,17 +114,16 @@ export default function Banners({ settings }: BannersProps) {
               className="
                 absolute
                 inset-0
-                bg-gradient-to-t
-                from-stone-950/95
-                via-stone-950/45
-                to-stone-950/5
-
-                md:bg-gradient-to-r
-                md:from-stone-950/90
-                md:via-stone-950/50
-                md:to-stone-950/5
+                bg-[linear-gradient(to_top,rgba(12,7,4,0.96)_0%,rgba(12,7,4,0.78)_34%,rgba(12,7,4,0.18)_72%,rgba(12,7,4,0.02)_100%)]
+                sm:bg-gradient-to-t
+                sm:from-stone-950/85
+                sm:via-stone-950/50
+                sm:to-stone-900/15
               "
             />
+
+            {/* Mobile left-side shading to keep text readable while showing the building */}
+            <div className="absolute inset-0 bg-[linear-gradient(to_right,rgba(10,6,4,0.72)_0%,rgba(10,6,4,0.28)_42%,rgba(10,6,4,0)_72%)] sm:hidden" />
 
             {/* Earthy / Green tint */}
             <div className="absolute inset-0 bg-emerald-950/10 mix-blend-color-burn" />
@@ -142,14 +140,13 @@ export default function Banners({ settings }: BannersProps) {
                 flex-col
                 justify-end
                 px-6
-                pb-12
+                pb-10
 
                 sm:justify-center
-                sm:px-12
+                sm:px-16
                 sm:pb-0
 
                 md:max-w-3xl
-                md:px-16
               "
             >
               <motion.div
@@ -192,13 +189,14 @@ export default function Banners({ settings }: BannersProps) {
                 ================================================== */}
                 <h1
                   className="
-                    text-[38px]
+                    text-[33px]
                     sm:text-5xl
                     md:text-6xl
                     font-serif
                     text-white
                     font-light
-                    leading-[1.12]
+                    leading-[1.06]
+                    sm:leading-[1.12]
                     tracking-tight
                     drop-shadow-lg
                   "
@@ -220,7 +218,7 @@ export default function Banners({ settings }: BannersProps) {
                 {/* Subtitle */}
                 <p
                   className="
-                    text-[13px]
+                    text-[12px]
                     sm:text-base
                     text-stone-200/90
                     max-w-xl
