@@ -16,56 +16,127 @@ export default function CustomerChat() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [message, setMessage] = useState("");
   const [sending, setSending] = useState(false);
+  const [loading, setLoading] = useState(false);
 
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  // สร้าง/โหลดห้องแชตของลูกค้า
+  // เริ่มต้นระบบแชต
   useEffect(() => {
     if (!open) return;
 
     const initChat = async () => {
-      let savedRoom = localStorage.getItem("namnoi_chat_room");
+      setLoading(true);
 
-      // ถ้ายังไม่มีห้อง ให้สร้างห้องใหม่
-      if (!savedRoom) {
-        const { data, error } = await supabase
-          .from("chat_rooms")
-          .insert({
-            user_name: "ผู้เยี่ยมชม",
-          })
-          .select()
-          .single();
+      try {
+        // เช็ก session ปัจจุบัน
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-        if (error) {
-          console.error("สร้างห้องแชตไม่สำเร็จ:", error);
+        let user = session?.user ?? null;
+
+        // ถ้ายังไม่มี user ให้ล็อกอินแบบ Anonymous
+        if (!user) {
+          const { data, error } =
+            await supabase.auth.signInAnonymously();
+
+          if (error) {
+            console.error(
+              "Anonymous login error:",
+              error
+            );
+            return;
+          }
+
+          user = data.user;
+        }
+
+        if (!user) {
+          console.error("ไม่พบผู้ใช้งาน");
           return;
         }
 
-        savedRoom = data.id;
+        // หา room เดิมของ user
+        const {
+          data: existingRoom,
+          error: selectRoomError,
+        } = await supabase
+          .from("chat_rooms")
+          .select("id")
+          .eq("owner_id", user.id)
+          .order("created_at", {
+            ascending: true,
+          })
+          .limit(1)
+          .maybeSingle();
 
-        localStorage.setItem(
-          "namnoi_chat_room",
-          data.id
+        if (selectRoomError) {
+          console.error(
+            "ค้นหาห้องแชตไม่สำเร็จ:",
+            selectRoomError
+          );
+          return;
+        }
+
+        let currentRoomId =
+          existingRoom?.id ?? null;
+
+        // ถ้ายังไม่มี room ให้สร้างใหม่
+        if (!currentRoomId) {
+          const {
+            data: newRoom,
+            error: createRoomError,
+          } = await supabase
+            .from("chat_rooms")
+            .insert({
+              user_name: "ผู้เยี่ยมชม",
+              owner_id: user.id,
+            })
+            .select("id")
+            .single();
+
+          if (createRoomError) {
+            console.error(
+              "สร้างห้องแชตไม่สำเร็จ:",
+              createRoomError
+            );
+            return;
+          }
+
+          currentRoomId = newRoom.id;
+        }
+
+        setRoomId(currentRoomId);
+
+        // โหลดข้อความเก่า
+        const {
+          data: oldMessages,
+          error: loadMessageError,
+        } = await supabase
+          .from("chat_messages")
+          .select("*")
+          .eq("room_id", currentRoomId)
+          .order("created_at", {
+            ascending: true,
+          });
+
+        if (loadMessageError) {
+          console.error(
+            "โหลดข้อความไม่สำเร็จ:",
+            loadMessageError
+          );
+          return;
+        }
+
+        setMessages(oldMessages || []);
+      } catch (error) {
+        console.error(
+          "เกิดข้อผิดพลาดในระบบแชต:",
+          error
         );
+      } finally {
+        setLoading(false);
       }
-
-      setRoomId(savedRoom);
-
-      // โหลดข้อความเก่า
-      const { data, error } = await supabase
-        .from("chat_messages")
-        .select("*")
-        .eq("room_id", savedRoom)
-        .order("created_at", {
-          ascending: true,
-        });
-
-      if (error) {
-        console.error("โหลดข้อความไม่สำเร็จ:", error);
-        return;
-      }
-
-      setMessages(data || []);
     };
 
     initChat();
@@ -91,12 +162,18 @@ export default function CustomerChat() {
 
           setMessages((current) => {
             const exists = current.some(
-              (item) => item.id === newMessage.id
+              (item) =>
+                item.id === newMessage.id
             );
 
-            if (exists) return current;
+            if (exists) {
+              return current;
+            }
 
-            return [...current, newMessage];
+            return [
+              ...current,
+              newMessage,
+            ];
           });
         }
       )
@@ -109,21 +186,27 @@ export default function CustomerChat() {
 
   // เลื่อนลงข้อความล่าสุด
   useEffect(() => {
+    if (!open) return;
+
     bottomRef.current?.scrollIntoView({
       behavior: "smooth",
     });
-  }, [messages]);
+  }, [messages, open]);
 
   // ส่งข้อความ
   const sendMessage = async () => {
-    if (!message.trim() || !roomId || sending) {
+    const text = message.trim();
+
+    if (
+      !text ||
+      !roomId ||
+      sending
+    ) {
       return;
     }
 
-    const text = message.trim();
-
-    setMessage("");
     setSending(true);
+    setMessage("");
 
     const { error } = await supabase
       .from("chat_messages")
@@ -134,7 +217,12 @@ export default function CustomerChat() {
       });
 
     if (error) {
-      console.error("ส่งข้อความไม่สำเร็จ:", error);
+      console.error(
+        "ส่งข้อความไม่สำเร็จ:",
+        error
+      );
+
+      // คืนข้อความกลับเข้าช่อง
       setMessage(text);
     }
 
@@ -164,9 +252,12 @@ export default function CustomerChat() {
             text-white
             shadow-2xl
             transition-all
+            duration-300
             hover:bg-[#725437]
             hover:scale-105
+            active:scale-95
           "
+          aria-label="ติดต่อแอดมิน"
         >
           <MessageCircle size={20} />
 
@@ -176,7 +267,7 @@ export default function CustomerChat() {
         </button>
       )}
 
-      {/* หน้าต่าง Chat */}
+      {/* กล่องแชต */}
       {open && (
         <div
           className="
@@ -186,7 +277,7 @@ export default function CustomerChat() {
             z-[9999]
             flex
             h-[560px]
-            max-h-[80vh]
+            max-h-[82vh]
             w-[380px]
             max-w-[calc(100vw-32px)]
             flex-col
@@ -199,10 +290,29 @@ export default function CustomerChat() {
           "
         >
           {/* Header */}
-          <div className="flex items-center justify-between bg-[#8E6D4E] px-5 py-4 text-white">
+          <div
+            className="
+              flex
+              items-center
+              justify-between
+              bg-[#8E6D4E]
+              px-5
+              py-4
+              text-white
+            "
+          >
             <div className="flex items-center gap-3">
-
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-white/15">
+              <div
+                className="
+                  flex
+                  h-10
+                  w-10
+                  items-center
+                  justify-center
+                  rounded-full
+                  bg-white/15
+                "
+              >
                 <MessageCircle size={20} />
               </div>
 
@@ -211,124 +321,212 @@ export default function CustomerChat() {
                   ติดต่อแอดมิน
                 </div>
 
-                <div className="flex items-center gap-1.5 text-[10px] text-white/80">
-                  <span className="h-2 w-2 rounded-full bg-green-400" />
+                <div
+                  className="
+                    flex
+                    items-center
+                    gap-1.5
+                    text-[10px]
+                    text-white/80
+                  "
+                >
+                  <span
+                    className="
+                      h-2
+                      w-2
+                      rounded-full
+                      bg-green-400
+                    "
+                  />
 
                   สอบถามปัญหาได้ที่นี่
                 </div>
               </div>
-
             </div>
 
             <button
               onClick={() => setOpen(false)}
-              className="rounded-full p-2 transition hover:bg-white/10"
+              className="
+                rounded-full
+                p-2
+                transition
+                hover:bg-white/10
+              "
+              aria-label="ปิดแชต"
             >
               <X size={20} />
             </button>
           </div>
 
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4">
-
-            {messages.length === 0 && (
-              <div className="mt-8 text-center">
-
-                <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-[#8E6D4E]/15 text-[#E2C7A9]">
-                  <MessageCircle size={23} />
-                </div>
-
-                <p className="text-sm font-semibold text-stone-200">
-                  ยินดีต้อนรับ 👋
-                </p>
-
-                <p className="mt-1 text-xs text-stone-500">
-                  มีปัญหาหรือข้อสงสัย
-                  <br />
-                  สามารถสอบถามแอดมินได้เลยครับ
-                </p>
-
+          {/* ข้อความ */}
+          <div
+            className="
+              flex-1
+              overflow-y-auto
+              p-4
+            "
+          >
+            {loading ? (
+              <div
+                className="
+                  flex
+                  h-full
+                  items-center
+                  justify-center
+                  text-xs
+                  text-stone-500
+                "
+              >
+                กำลังเชื่อมต่อแชต...
               </div>
-            )}
-
-            <div className="space-y-3">
-
-              {messages.map((msg) => {
-
-                const isUser =
-                  msg.sender_type === "user";
-
-                return (
-                  <div
-                    key={msg.id}
-                    className={`flex ${
-                      isUser
-                        ? "justify-end"
-                        : "justify-start"
-                    }`}
-                  >
+            ) : (
+              <>
+                {messages.length === 0 && (
+                  <div className="mt-8 text-center">
                     <div
-                      className={`
-                        max-w-[80%]
-                        rounded-2xl
-                        px-4
-                        py-2.5
-                        text-sm
-                        leading-relaxed
-                        ${
-                          isUser
-                            ? "rounded-br-md bg-[#8E6D4E] text-white"
-                            : "rounded-bl-md bg-stone-800 text-stone-100"
-                        }
-                      `}
+                      className="
+                        mx-auto
+                        mb-3
+                        flex
+                        h-12
+                        w-12
+                        items-center
+                        justify-center
+                        rounded-full
+                        bg-[#8E6D4E]/15
+                        text-[#E2C7A9]
+                      "
                     >
-                      <div>{msg.message}</div>
+                      <MessageCircle
+                        size={23}
+                      />
+                    </div>
 
+                    <p
+                      className="
+                        text-sm
+                        font-semibold
+                        text-stone-200
+                      "
+                    >
+                      ยินดีต้อนรับ 👋
+                    </p>
+
+                    <p
+                      className="
+                        mt-1
+                        text-xs
+                        leading-relaxed
+                        text-stone-500
+                      "
+                    >
+                      มีปัญหาหรือข้อสงสัย
+                      <br />
+                      สามารถสอบถามแอดมินได้เลยครับ
+                    </p>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  {messages.map((msg) => {
+                    const isUser =
+                      msg.sender_type ===
+                      "user";
+
+                    return (
                       <div
-                        className={`mt-1 text-[9px] ${
+                        key={msg.id}
+                        className={`flex ${
                           isUser
-                            ? "text-white/60"
-                            : "text-stone-500"
+                            ? "justify-end"
+                            : "justify-start"
                         }`}
                       >
-                        {new Date(
-                          msg.created_at
-                        ).toLocaleTimeString(
-                          "th-TH",
-                          {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          }
-                        )}
+                        <div
+                          className={`
+                            max-w-[80%]
+                            rounded-2xl
+                            px-4
+                            py-2.5
+                            text-sm
+                            leading-relaxed
+
+                            ${
+                              isUser
+                                ? "rounded-br-md bg-[#8E6D4E] text-white"
+                                : "rounded-bl-md bg-stone-800 text-stone-100"
+                            }
+                          `}
+                        >
+                          <div
+                            className="
+                              whitespace-pre-wrap
+                              break-words
+                            "
+                          >
+                            {msg.message}
+                          </div>
+
+                          <div
+                            className={`mt-1 text-[9px] ${
+                              isUser
+                                ? "text-white/60"
+                                : "text-stone-500"
+                            }`}
+                          >
+                            {new Date(
+                              msg.created_at
+                            ).toLocaleTimeString(
+                              "th-TH",
+                              {
+                                hour:
+                                  "2-digit",
+                                minute:
+                                  "2-digit",
+                              }
+                            )}
+                          </div>
+                        </div>
                       </div>
+                    );
+                  })}
 
-                    </div>
-                  </div>
-                );
-              })}
-
-              <div ref={bottomRef} />
-
-            </div>
+                  <div ref={bottomRef} />
+                </div>
+              </>
+            )}
           </div>
 
-          {/* ช่องส่งข้อความ */}
-          <div className="border-t border-white/10 bg-[#1C1815] p-3">
-
+          {/* ช่องพิมพ์ข้อความ */}
+          <div
+            className="
+              border-t
+              border-white/10
+              bg-[#1C1815]
+              p-3
+            "
+          >
             <div className="flex items-center gap-2">
-
               <input
                 type="text"
                 value={message}
                 onChange={(e) =>
-                  setMessage(e.target.value)
+                  setMessage(
+                    e.target.value
+                  )
                 }
                 onKeyDown={(e) => {
-                  if (e.key === "Enter") {
+                  if (
+                    e.key === "Enter"
+                  ) {
+                    e.preventDefault();
                     sendMessage();
                   }
                 }}
                 placeholder="พิมพ์ข้อความ..."
+                disabled={
+                  loading || !roomId
+                }
                 className="
                   min-w-0
                   flex-1
@@ -344,13 +542,17 @@ export default function CustomerChat() {
                   transition
                   placeholder:text-stone-600
                   focus:border-[#8E6D4E]
+                  disabled:opacity-50
                 "
               />
 
               <button
                 onClick={sendMessage}
                 disabled={
-                  !message.trim() || sending
+                  !message.trim() ||
+                  sending ||
+                  loading ||
+                  !roomId
                 }
                 className="
                   flex
@@ -367,10 +569,21 @@ export default function CustomerChat() {
                   disabled:cursor-not-allowed
                   disabled:opacity-40
                 "
+                aria-label="ส่งข้อความ"
               >
                 <Send size={18} />
               </button>
+            </div>
 
+            <div
+              className="
+                mt-2
+                text-center
+                text-[9px]
+                text-stone-600
+              "
+            >
+              ระบบติดต่อแอดมินแบบ Real-time
             </div>
           </div>
         </div>

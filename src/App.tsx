@@ -1,4 +1,5 @@
 import React, { useState, useEffect, CSSProperties } from "react";
+import CustomerChat from "./components/CustomerChat";
 import { AppSettings, Category, Product, User, Coupon, Transaction, Review } from "./types";
 import { Language, getTranslation } from "./lib/translations";
 import Header from "./components/Header";
@@ -1749,7 +1750,7 @@ export default function App() {
               ))}
             </AnimatePresence>
           </div>
-
+          <CustomerChat />
         </>
       )}
 
