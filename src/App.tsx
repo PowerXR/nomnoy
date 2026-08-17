@@ -1243,57 +1243,6 @@ export default function App() {
             </div>
           </section>
 
-          {/* Artisans Section */}
-          <section id="artisans-section" className="mx-auto max-w-7xl px-4 py-12 sm:px-6 lg:px-8 scroll-mt-20">
-            <div className="text-center space-y-2 mb-10">
-              <span className="text-[10px] text-[#8E6D4E] uppercase tracking-widest font-extrabold">
-                OUR CRAFTSMEN
-              </span>
-              <h3 className="text-2xl sm:text-3xl font-serif font-semibold text-[#4E3B2C] dark:text-[#E2C7A9]">
-                {getTranslation(lang, "artisansTitle")}
-              </h3>
-              <p className="text-xs text-stone-500 max-w-lg mx-auto font-light">
-                {getTranslation(lang, "artisansSub")}
-              </p>
-              <div className="w-16 h-0.5 bg-[#8E6D4E] mx-auto mt-2"></div>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              {(settings.artisans || []).map((art) => (
-                <div 
-                  key={art.id} 
-                  className="bg-[#FAF7F2] dark:bg-[#1C1815] p-6 rounded-2xl border border-[#8E6D4E]/10 hover:border-[#8E6D4E]/30 transition-all duration-300 flex flex-col sm:flex-row gap-5 items-center sm:items-start"
-                >
-                  <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-[#8E6D4E]/30 shadow-sm flex-shrink-0 bg-stone-900">
-                    <img 
-                      src={art.imageUrl || "https://images.unsplash.com/photo-1544005313-94ddf0286df2?auto=format&fit=crop&q=80&w=400"} 
-                      alt={art.name}
-                      referrerPolicy="no-referrer"
-                      className="w-full h-full object-cover" 
-                    />
-                  </div>
-                  <div className="flex-grow text-center sm:text-left space-y-2 min-w-0">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                      <h4 className="font-serif font-bold text-[#4E3B2C] dark:text-[#E2C7A9] text-base truncate">
-                        {art.name}
-                      </h4>
-                      <span className="inline-block text-[9px] bg-[#8E6D4E]/10 dark:bg-[#8E6D4E]/20 text-[#8E6D4E] dark:text-[#E2C7A9] font-bold px-2 py-0.5 rounded-full border border-[#8E6D4E]/15 self-center sm:self-auto whitespace-nowrap">
-                        {art.expertise}
-                      </span>
-                    </div>
-                    <p className="text-xs text-stone-500 dark:text-stone-400 font-light leading-relaxed whitespace-pre-wrap">
-                      {art.bio}
-                    </p>
-                  </div>
-                </div>
-              ))}
-              {(settings.artisans || []).length === 0 && (
-                <div className="col-span-1 md:col-span-2 text-center py-12 bg-[#FAF7F2]/50 dark:bg-[#161311] rounded-2xl border border-dashed border-[#8E6D4E]/20 text-stone-500 text-xs">
-                  {getTranslation(lang, "emptyArtisans")}
-                </div>
-              )}
-            </div>
-          </section>
 
           {/* Quick Stats banner for high professional presentation */}
           <section className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
