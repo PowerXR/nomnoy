@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, Send, X } from "lucide-react";
-import { supabase } from "../lib/supabase";
+import { supabase } from "../supabase";
 
 interface ChatMessage {
   id: string;
