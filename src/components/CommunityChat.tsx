@@ -12,7 +12,7 @@ interface CommunityChatProps {
   user: User | null;
   onClose: () => void;
   products: Product[];
-  lang?: "th" | "en";
+  lang?: "th" | "en" | "zh";
   activeSellerId?: string | null; // pass from product page to pre-open chat
 }
 
