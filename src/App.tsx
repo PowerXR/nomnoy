@@ -1,5 +1,4 @@
 import React, { useState, useEffect, CSSProperties } from "react";
-import CustomerChat from "./components/CustomerChat";
 import { AppSettings, Category, Product, User, Coupon, Transaction, Review } from "./types";
 import { Language, getTranslation } from "./lib/translations";
 import Header from "./components/Header";
@@ -12,7 +11,6 @@ import AuthModal from "./components/AuthModal";
 import HistoryModal from "./components/HistoryModal";
 import { MaintenanceCountdown } from "./components/MaintenanceCountdown";
 import SellerModal from "./components/SellerModal";
-import CommunityChat from "./components/CommunityChat";
 import ProfileModal from "./components/ProfileModal";
 import { MessageSquare } from "lucide-react";
 import NamNoiMap from "./components/NamNoiMap";
@@ -1750,7 +1748,6 @@ export default function App() {
               ))}
             </AnimatePresence>
           </div>
-          <CustomerChat />
         </>
       )}
 
