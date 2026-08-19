@@ -11,6 +11,7 @@ import AuthModal from "./components/AuthModal";
 import HistoryModal from "./components/HistoryModal";
 import { MaintenanceCountdown } from "./components/MaintenanceCountdown";
 import SellerModal from "./components/SellerModal";
+import CommunityChat from "./components/CommunityChat";
 import ProfileModal from "./components/ProfileModal";
 import { MessageSquare } from "lucide-react";
 import NamNoiMap from "./components/NamNoiMap";
@@ -1477,7 +1478,7 @@ export default function App() {
 
             {/* Real-time Community Chat Drawer/Modal Panel */}
             <AnimatePresence>
-              {chatOpen && (
+              {chatOpen && user && (
                 <CommunityChat 
                   user={user} 
                   onClose={() => { setChatOpen(false); setActiveChatSellerId(null); }} 
