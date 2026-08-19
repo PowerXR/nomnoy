@@ -80,7 +80,6 @@ export default function Header({
           <a href="#homepage" className="relative transition-colors hover:text-[#8E6D4E] after:absolute after:bottom-[-4px] after:left-0 after:h-[1.5px] after:w-0 hover:after:w-full after:bg-[#8E6D4E] after:transition-all after:duration-300">{getTranslation(lang, "home")}</a>
           <a href="#about-us-section" className="relative transition-colors hover:text-[#8E6D4E] after:absolute after:bottom-[-4px] after:left-0 after:h-[1.5px] after:w-0 hover:after:w-full after:bg-[#8E6D4E] after:transition-all after:duration-300">{getTranslation(lang, "aboutUs")}</a>
           <a href="#portfolios-section" className="relative transition-colors hover:text-[#8E6D4E] after:absolute after:bottom-[-4px] after:left-0 after:h-[1.5px] after:w-0 hover:after:w-full after:bg-[#8E6D4E] after:transition-all after:duration-300">{getTranslation(lang, "portfolios")}</a>
-          <a href="#artisans-section" className="relative transition-colors hover:text-[#8E6D4E] after:absolute after:bottom-[-4px] after:left-0 after:h-[1.5px] after:w-0 hover:after:w-full after:bg-[#8E6D4E] after:transition-all after:duration-300">{getTranslation(lang, "artisans")}</a>
           <a href="#recommended-products" className="relative transition-colors hover:text-[#8E6D4E] after:absolute after:bottom-[-4px] after:left-0 after:h-[1.5px] after:w-0 hover:after:w-full after:bg-[#8E6D4E] after:transition-all after:duration-300">{getTranslation(lang, "products")}</a>
           <a href={settings.contactFacebook || "#"} target="_blank" rel="noreferrer" className="relative transition-colors hover:text-[#8E6D4E] after:absolute after:bottom-[-4px] after:left-0 after:h-[1.5px] after:w-0 hover:after:w-full after:bg-[#8E6D4E] after:transition-all after:duration-300">{getTranslation(lang, "contactUs")}</a>
         </nav>
@@ -454,9 +453,6 @@ export default function Header({
               </a>
               <a href="#portfolios-section" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-[#8E6D4E]/5 text-stone-600 dark:text-stone-300 hover:text-[#8E6D4E] font-semibold text-xs transition-all">
                 🎨 {getTranslation(lang, "portfolios")}
-              </a>
-              <a href="#artisans-section" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-[#8E6D4E]/5 text-stone-600 dark:text-stone-300 hover:text-[#8E6D4E] font-semibold text-xs transition-all">
-                🤝 {getTranslation(lang, "artisans")}
               </a>
               <a href="#recommended-products" onClick={() => setMobileMenuOpen(false)} className="flex items-center gap-2.5 px-2.5 py-2 rounded-xl hover:bg-[#8E6D4E]/5 text-stone-600 dark:text-stone-300 hover:text-[#8E6D4E] font-semibold text-xs transition-all">
                 🛍️ {getTranslation(lang, "products")}
