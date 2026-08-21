@@ -35,7 +35,7 @@ function splitText(text: string, maxLength = 180) {
 export default function TextReader() {
   const [isOpen, setIsOpen] = useState(false);
   const [status, setStatus] = useState<ReaderStatus>("idle");
-  const [rate, setRate] = useState(0.9);
+  const [rate, setRate] = useState(0.6);
 
   const voicesRef = useRef<SpeechSynthesisVoice[]>([]);
   const chunksRef = useRef<string[]>([]);
@@ -259,7 +259,7 @@ export default function TextReader() {
             <input
               id="speech-rate"
               type="range"
-              min="0.7"
+              min="0.4"
               max="1.2"
               step="0.1"
               value={rate}
