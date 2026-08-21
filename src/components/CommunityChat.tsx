@@ -16,6 +16,24 @@ interface CommunityChatProps {
   activeSellerId?: string | null; // pass from product page to pre-open chat
 }
 
+const ADMIN_SUPPORT_SHOP_ID = "admin-support";
+const DEFAULT_COMPLAINT_CATEGORY = "คำสั่งซื้อ";
+const COMPLAINT_CATEGORIES = [
+  DEFAULT_COMPLAINT_CATEGORY,
+  "การชำระเงิน",
+  "สินค้า",
+  "บัญชีผู้ใช้",
+  "การใช้งานเว็บไซต์",
+  "พฤติกรรมผู้ขาย",
+  "อื่น ๆ"
+];
+
+const isComplaintConversation = (conversation: Conversation | null | undefined) =>
+  Boolean(
+    conversation &&
+    (conversation as Conversation & { shopId?: string }).shopId === ADMIN_SUPPORT_SHOP_ID
+  );
+
 export default function CommunityChat({
   user,
   onClose,
@@ -69,6 +87,14 @@ export default function CommunityChat({
   const [imageFormOpen, setImageFormOpen] = useState(false);
   const [chatImageUrl, setChatImageUrl] = useState("");
 
+  // Private complaint form state
+  const [complaintFormOpen, setComplaintFormOpen] = useState(false);
+  const [complaintCategory, setComplaintCategory] = useState(DEFAULT_COMPLAINT_CATEGORY);
+  const [complaintSubject, setComplaintSubject] = useState("");
+  const [complaintDetails, setComplaintDetails] = useState("");
+  const [complaintSubmitting, setComplaintSubmitting] = useState(false);
+  const [complaintError, setComplaintError] = useState("");
+
   // Order invoice form states
   const [invoiceProdName, setInvoiceProdName] = useState("");
   const [invoicePrice, setInvoicePrice] = useState("");
@@ -84,7 +110,7 @@ export default function CommunityChat({
   const [typingUsers, setTypingUsers] = useState<Record<string, boolean>>({});
 
   // Admin Dashboard State
-  const [adminTab, setAdminTab] = useState<"monitor" | "dashboard">("dashboard");
+  const [adminTab, setAdminTab] = useState<"monitor" | "dashboard" | "complaints">("dashboard");
   const [adminStats, setAdminStats] = useState<any>({
     totalRooms: 0,
     totalMessages: 0,
@@ -295,6 +321,99 @@ export default function CommunityChat({
       }
     } catch (err) {
       console.error("Failed to initiate chat:", err);
+    }
+  };
+
+  // Create or open a private room between the current customer and an admin,
+  // then send the first complaint message into that room.
+  const handleSubmitComplaint = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const subject = complaintSubject.trim();
+    const details = complaintDetails.trim();
+
+    if (!subject || !details) {
+      setComplaintError("กรุณากรอกหัวข้อและรายละเอียดให้ครบถ้วน");
+      return;
+    }
+
+    setComplaintSubmitting(true);
+    setComplaintError("");
+
+    try {
+      const roomRes = await fetch("/api/chat/admin-support", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": user.id,
+          "x-user-role": user.role
+        }
+      });
+
+      const room = await roomRes.json().catch(() => null);
+      if (!roomRes.ok || !room?.id) {
+        throw new Error(room?.error || "ไม่สามารถเปิดห้องร้องเรียนได้");
+      }
+
+      const now = new Date();
+      const complaintCode = `CMP-${now.toISOString().slice(0, 10).replace(/-/g, "")}-${Date.now().toString().slice(-4)}`;
+      const complaintMessage = [
+        "🚨 เรื่องร้องเรียนถึงแอดมิน",
+        `เลขคำร้อง: ${complaintCode}`,
+        `ประเภท: ${complaintCategory}`,
+        `หัวข้อ: ${subject}`,
+        "รายละเอียด:",
+        details
+      ].join("\n");
+
+      const messageRes = await fetch(`/api/chat/conversations/${room.id}/messages`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-user-id": user.id,
+          "x-user-role": user.role
+        },
+        body: JSON.stringify({
+          message: complaintMessage,
+          messageType: "text"
+        })
+      });
+
+      const sentMessage = await messageRes.json().catch(() => null);
+      if (!messageRes.ok || !sentMessage?.id) {
+        throw new Error(sentMessage?.error || "เปิดห้องแล้ว แต่ส่งรายละเอียดร้องเรียนไม่สำเร็จ");
+      }
+
+      const listRes = await fetch("/api/chat/conversations", {
+        headers: {
+          "x-user-id": user.id,
+          "x-user-role": user.role
+        }
+      });
+      const listData = await listRes.json().catch(() => []);
+      if (!listRes.ok || !Array.isArray(listData)) {
+        throw new Error("ส่งคำร้องแล้ว แต่ไม่สามารถเปิดห้องสนทนาได้");
+      }
+
+      const uniqueData = listData.filter((c, idx, self) =>
+        self.findIndex((item) => item.id === c.id) === idx
+      );
+      setConversations(uniqueData);
+
+      const complaintRoom = uniqueData.find((c) => c.id === room.id);
+      if (!complaintRoom) {
+        throw new Error("ส่งคำร้องแล้ว กรุณาปิดและเปิดหน้าต่างแชตใหม่อีกครั้ง");
+      }
+
+      setComplaintSubject("");
+      setComplaintDetails("");
+      setComplaintCategory(DEFAULT_COMPLAINT_CATEGORY);
+      setComplaintFormOpen(false);
+      await selectConversation(complaintRoom);
+    } catch (err) {
+      setComplaintError(err instanceof Error ? err.message : "เกิดข้อผิดพลาด กรุณาลองใหม่อีกครั้ง");
+    } finally {
+      setComplaintSubmitting(false);
     }
   };
 
@@ -635,6 +754,10 @@ export default function CommunityChat({
 
   // Filter conversations based on search
   const filteredConvs = conversations.filter((c) => {
+    if (user.role === "admin" && adminTab === "complaints" && !isComplaintConversation(c)) {
+      return false;
+    }
+
     const q = searchQuery.toLowerCase();
     if (user.role === "admin") {
       return c.customerName.toLowerCase().includes(q) || c.shopName.toLowerCase().includes(q);
@@ -679,6 +802,148 @@ export default function CommunityChat({
           </button>
         </div>
 
+        {/* Private complaint form */}
+        <AnimatePresence>
+          {complaintFormOpen && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4 backdrop-blur-sm"
+              onMouseDown={(e) => {
+                if (e.target === e.currentTarget && !complaintSubmitting) {
+                  setComplaintFormOpen(false);
+                  setComplaintError("");
+                }
+              }}
+            >
+              <motion.div
+                initial={{ opacity: 0, scale: 0.96, y: 18 }}
+                animate={{ opacity: 1, scale: 1, y: 0 }}
+                exit={{ opacity: 0, scale: 0.96, y: 18 }}
+                className="w-full max-w-lg overflow-hidden rounded-3xl border border-red-200/60 bg-white shadow-2xl dark:border-red-900/30 dark:bg-[#1A1612]"
+              >
+                <div className="flex items-start justify-between gap-4 border-b border-red-100 bg-red-50 px-5 py-4 dark:border-red-950/40 dark:bg-red-950/20">
+                  <div className="flex items-start gap-3">
+                    <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-red-600 text-white shadow-lg shadow-red-600/20">
+                      <AlertTriangle size={20} />
+                    </div>
+                    <div>
+                      <h3 className="text-sm font-black text-stone-900 dark:text-stone-100">
+                        ร้องเรียนหรือแจ้งปัญหาถึงแอดมิน
+                      </h3>
+                      <p className="mt-0.5 text-[10px] leading-relaxed text-stone-500 dark:text-stone-400">
+                        ข้อมูลนี้เป็นห้องส่วนตัว เห็นได้เฉพาะคุณและผู้ดูแลระบบ
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={complaintSubmitting}
+                    onClick={() => {
+                      setComplaintFormOpen(false);
+                      setComplaintError("");
+                    }}
+                    className="rounded-full p-1.5 text-stone-400 transition-colors hover:bg-red-100 hover:text-red-600 disabled:opacity-40 dark:hover:bg-red-950/40"
+                    aria-label="ปิดแบบฟอร์มร้องเรียน"
+                  >
+                    <X size={17} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleSubmitComplaint} className="space-y-4 p-5">
+                  <div>
+                    <label className="mb-1.5 block text-[10px] font-extrabold text-stone-600 dark:text-stone-300">
+                      ประเภทปัญหา
+                    </label>
+                    <select
+                      value={complaintCategory}
+                      onChange={(e) => setComplaintCategory(e.target.value)}
+                      className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-xs text-stone-900 outline-none transition-colors focus:border-red-500 dark:border-white/10 dark:bg-stone-950/50 dark:text-white"
+                    >
+                      {COMPLAINT_CATEGORIES.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-[10px] font-extrabold text-stone-600 dark:text-stone-300">
+                      หัวข้อเรื่องร้องเรียน
+                    </label>
+                    <input
+                      type="text"
+                      value={complaintSubject}
+                      onChange={(e) => setComplaintSubject(e.target.value)}
+                      maxLength={120}
+                      placeholder="เช่น ชำระเงินแล้วแต่ยอดเงินไม่เข้า"
+                      className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-xs text-stone-900 outline-none transition-colors placeholder:text-stone-400 focus:border-red-500 dark:border-white/10 dark:bg-stone-950/50 dark:text-white"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="mb-1.5 block text-[10px] font-extrabold text-stone-600 dark:text-stone-300">
+                      รายละเอียด
+                    </label>
+                    <textarea
+                      value={complaintDetails}
+                      onChange={(e) => setComplaintDetails(e.target.value)}
+                      rows={5}
+                      maxLength={2000}
+                      placeholder="อธิบายเหตุการณ์ วันเวลา เลขคำสั่งซื้อ หรือข้อมูลที่ช่วยให้แอดมินตรวจสอบได้"
+                      className="w-full resize-none rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-xs leading-relaxed text-stone-900 outline-none transition-colors placeholder:text-stone-400 focus:border-red-500 dark:border-white/10 dark:bg-stone-950/50 dark:text-white"
+                    />
+                    <div className="mt-1 flex justify-between text-[9px] text-stone-400">
+                      <span>หลังส่งแล้วสามารถแนบรูปหลักฐานในห้องสนทนาได้</span>
+                      <span>{complaintDetails.length}/2000</span>
+                    </div>
+                  </div>
+
+                  {complaintError && (
+                    <div className="flex items-start gap-2 rounded-xl border border-red-200 bg-red-50 px-3 py-2.5 text-[10px] font-semibold text-red-700 dark:border-red-950/40 dark:bg-red-950/20 dark:text-red-300">
+                      <AlertCircle size={14} className="mt-0.5 flex-shrink-0" />
+                      <span>{complaintError}</span>
+                    </div>
+                  )}
+
+                  <div className="flex flex-col-reverse gap-2 pt-1 sm:flex-row sm:justify-end">
+                    <button
+                      type="button"
+                      disabled={complaintSubmitting}
+                      onClick={() => {
+                        setComplaintFormOpen(false);
+                        setComplaintError("");
+                      }}
+                      className="rounded-xl border border-stone-200 px-5 py-2.5 text-xs font-bold text-stone-600 transition-colors hover:bg-stone-50 disabled:opacity-40 dark:border-white/10 dark:text-stone-300 dark:hover:bg-stone-900"
+                    >
+                      ยกเลิก
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={complaintSubmitting || !complaintSubject.trim() || !complaintDetails.trim()}
+                      className="flex items-center justify-center gap-2 rounded-xl bg-red-600 px-5 py-2.5 text-xs font-black text-white shadow-lg shadow-red-600/20 transition-all hover:bg-red-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                    >
+                      {complaintSubmitting ? (
+                        <>
+                          <RefreshCw size={14} className="animate-spin" />
+                          กำลังส่งคำร้อง...
+                        </>
+                      ) : (
+                        <>
+                          <Send size={14} />
+                          ส่งคำร้องถึงแอดมิน
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
         {/* Content Body */}
         {user.role === "admin" ? (
           // ==================== ADMIN LAYOUT ====================
@@ -702,6 +967,18 @@ export default function CommunityChat({
               >
                 <Eye size={15} />
                 <span>มอนิเตอร์แชทสด</span>
+              </button>
+              <button
+                onClick={() => {
+                  setAdminTab("complaints");
+                  setActiveConv(null);
+                }}
+                className={`flex-1 md:flex-initial py-2 px-3.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all ${
+                  adminTab === "complaints" ? "bg-red-600 text-white shadow-md shadow-red-500/10" : "hover:bg-stone-200 dark:hover:bg-stone-800 text-stone-600 dark:text-stone-300"
+                }`}
+              >
+                <AlertTriangle size={15} />
+                <span>เรื่องร้องเรียน</span>
               </button>
             </div>
 
@@ -773,14 +1050,14 @@ export default function CommunityChat({
                     <div className="p-3 border-b border-stone-200/80 dark:border-white/5">
                       <input 
                         type="text" 
-                        placeholder="🔍 ค้นหาห้องแชท ลูกค้า หรือร้านค้า..." 
+                        placeholder={adminTab === "complaints" ? "🔍 ค้นหาเรื่องร้องเรียน..." : "🔍 ค้นหาห้องแชท ลูกค้า หรือร้านค้า..."}
                         value={searchQuery}
                         onChange={(e) => setSearchQuery(e.target.value)}
                         className="w-full bg-stone-100 dark:bg-stone-950/60 text-xs rounded-xl border border-stone-200/40 dark:border-white/5 p-2 px-3 focus:outline-none focus:border-[#16A34A]"
                       />
                     </div>
                     <div className="flex-1 overflow-y-auto">
-                      {filteredConvs.map((c) => (
+                      {filteredConvs.length > 0 ? filteredConvs.map((c) => (
                         <button
                           key={c.id}
                           onClick={() => selectConversation(c)}
@@ -788,7 +1065,11 @@ export default function CommunityChat({
                             activeConv?.id === c.id ? "bg-stone-100 dark:bg-stone-950/50" : "hover:bg-stone-50 dark:hover:bg-stone-950/20"
                           }`}
                         >
-                          <div className="w-8 h-8 rounded-full bg-stone-200 dark:bg-stone-800 flex items-center justify-center font-bold text-stone-700 dark:text-stone-300 text-xs flex-shrink-0">
+                          <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs flex-shrink-0 ${
+                            isComplaintConversation(c)
+                              ? "bg-red-100 text-red-600 dark:bg-red-950/40 dark:text-red-400"
+                              : "bg-stone-200 dark:bg-stone-800 text-stone-700 dark:text-stone-300"
+                          }`}>
                             {c.customerName.charAt(0)}
                           </div>
                           <div className="min-w-0 flex-grow">
@@ -796,11 +1077,20 @@ export default function CommunityChat({
                               <span className="text-[11.5px] font-black text-stone-900 dark:text-stone-100 truncate">{c.customerName}</span>
                               <span className="text-[9px] text-stone-400 flex-shrink-0">{new Date(c.lastMessageAt).toLocaleTimeString([], {hour: "2-digit", minute:"2-digit"})}</span>
                             </div>
-                            <div className="text-[9.5px] text-[#16A34A] font-extrabold mb-1 truncate">คุยกับ: {c.shopName}</div>
+                            <div className={`text-[9.5px] font-extrabold mb-1 truncate ${isComplaintConversation(c) ? "text-red-600 dark:text-red-400" : "text-[#16A34A]"}`}>
+                              {isComplaintConversation(c) ? "🚨 ร้องเรียนถึงแอดมิน" : `คุยกับ: ${c.shopName}`}
+                            </div>
                             <div className="text-[10px] text-stone-500 dark:text-stone-400 truncate leading-snug">{c.lastMessage}</div>
                           </div>
                         </button>
-                      ))}
+                      )) : (
+                        <div className="flex flex-col items-center justify-center px-5 py-12 text-center text-stone-400">
+                          <AlertTriangle size={30} className={adminTab === "complaints" ? "mb-2 text-red-300 dark:text-red-900" : "mb-2 text-stone-300 dark:text-stone-800"} />
+                          <p className="text-[11px] font-bold">
+                            {adminTab === "complaints" ? "ยังไม่มีเรื่องร้องเรียนจากผู้ใช้" : "ยังไม่มีห้องสนทนาในระบบ"}
+                          </p>
+                        </div>
+                      )}
                     </div>
                   </div>
 
@@ -812,31 +1102,55 @@ export default function CommunityChat({
                         <div>
                           <h4 className="text-xs font-black text-stone-900 dark:text-stone-100 flex items-center gap-1.5">
                             <Shield size={14} className="text-red-500" />
-                            <span>กำลังมอนิเตอร์แชทสด</span>
+                            <span>{isComplaintConversation(activeConv) ? "ศูนย์จัดการเรื่องร้องเรียน" : "กำลังมอนิเตอร์แชทสด"}</span>
                           </h4>
                           <p className="text-[9.5px] text-stone-500 leading-tight">
-                            ลูกค้า: <strong>{activeConv.customerName}</strong> คุยกับร้าน: <strong>{activeConv.shopName}</strong>
+                            {isComplaintConversation(activeConv) ? (
+                              <>ผู้ร้องเรียน: <strong>{activeConv.customerName}</strong> · ห้องสนทนาส่วนตัวกับแอดมิน</>
+                            ) : (
+                              <>ลูกค้า: <strong>{activeConv.customerName}</strong> คุยกับร้าน: <strong>{activeConv.shopName}</strong></>
+                            )}
                           </p>
                         </div>
 
                         {/* Mod panel */}
                         <div className="flex gap-2">
-                          {activeConv.status !== "blocked" ? (
-                            <button 
-                              onClick={() => handleUpdateStatus("blocked")}
-                              className="bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400 py-1.5 px-3 rounded-lg text-[10px] font-extrabold uppercase tracking-wide flex items-center gap-1 cursor-pointer hover:bg-red-200 dark:hover:bg-red-950/60"
-                            >
-                              <ShieldAlert size={12} />
-                              <span>บล็อกปิดห้องแชท</span>
-                            </button>
+                          {isComplaintConversation(activeConv) ? (
+                            activeConv.status === "closed" ? (
+                              <button
+                                onClick={() => handleUpdateStatus("active")}
+                                className="bg-emerald-100 dark:bg-emerald-950/30 text-[#16A34A] py-1.5 px-3 rounded-lg text-[10px] font-extrabold flex items-center gap-1 cursor-pointer hover:bg-emerald-200 dark:hover:bg-emerald-950/60"
+                              >
+                                <RefreshCw size={12} />
+                                <span>เปิดดำเนินการอีกครั้ง</span>
+                              </button>
+                            ) : (
+                              <button
+                                onClick={() => handleUpdateStatus("closed")}
+                                className="bg-emerald-100 dark:bg-emerald-950/30 text-[#16A34A] py-1.5 px-3 rounded-lg text-[10px] font-extrabold flex items-center gap-1 cursor-pointer hover:bg-emerald-200 dark:hover:bg-emerald-950/60"
+                              >
+                                <CheckCircle2 size={12} />
+                                <span>ทำเครื่องหมายว่าแก้ไขแล้ว</span>
+                              </button>
+                            )
                           ) : (
-                            <button 
-                              onClick={() => handleUpdateStatus("active")}
-                              className="bg-emerald-100 dark:bg-emerald-950/30 text-[#16A34A] py-1.5 px-3 rounded-lg text-[10px] font-extrabold uppercase tracking-wide flex items-center gap-1 cursor-pointer hover:bg-emerald-200 dark:hover:bg-emerald-950/60"
-                            >
-                              <CheckCircle2 size={12} />
-                              <span>ปลดบล็อกห้องแชท</span>
-                            </button>
+                            activeConv.status !== "blocked" ? (
+                              <button 
+                                onClick={() => handleUpdateStatus("blocked")}
+                                className="bg-red-100 dark:bg-red-950/30 text-red-600 dark:text-red-400 py-1.5 px-3 rounded-lg text-[10px] font-extrabold uppercase tracking-wide flex items-center gap-1 cursor-pointer hover:bg-red-200 dark:hover:bg-red-950/60"
+                              >
+                                <ShieldAlert size={12} />
+                                <span>บล็อกปิดห้องแชท</span>
+                              </button>
+                            ) : (
+                              <button 
+                                onClick={() => handleUpdateStatus("active")}
+                                className="bg-emerald-100 dark:bg-emerald-950/30 text-[#16A34A] py-1.5 px-3 rounded-lg text-[10px] font-extrabold uppercase tracking-wide flex items-center gap-1 cursor-pointer hover:bg-emerald-200 dark:hover:bg-emerald-950/60"
+                              >
+                                <CheckCircle2 size={12} />
+                                <span>ปลดบล็อกห้องแชท</span>
+                              </button>
+                            )
                           )}
 
                           <button 
@@ -862,7 +1176,11 @@ export default function CommunityChat({
                               }`}>
                                 <div className="flex items-center justify-between gap-6">
                                   <span className="text-[9px] font-extrabold uppercase tracking-wide opacity-60">
-                                    {isFromCustomer ? `ลูกค้า: ${activeConv.customerName}` : `ผู้ขาย: ${activeConv.shopName}`}
+                                    {isFromCustomer
+                                      ? `ลูกค้า: ${activeConv.customerName}`
+                                      : isComplaintConversation(activeConv)
+                                        ? "แอดมินเทศบาล"
+                                        : `ผู้ขาย: ${activeConv.shopName}`}
                                   </span>
                                   <button 
                                     onClick={() => handleDeleteMessage(m.id)}
@@ -872,7 +1190,7 @@ export default function CommunityChat({
                                     <Trash2 size={11} />
                                   </button>
                                 </div>
-                                <p className="text-[11.5px] leading-relaxed font-medium">{m.message}</p>
+                                <p className="whitespace-pre-wrap text-[11.5px] leading-relaxed font-medium">{m.message}</p>
                                 <span className="text-[8px] text-stone-400 self-end block pt-0.5">{new Date(m.createdAt).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}</span>
                               </div>
                             </div>
@@ -880,12 +1198,50 @@ export default function CommunityChat({
                         })}
                         <div ref={chatEndRef} />
                       </div>
+
+                      {/* Admin reply box */}
+                      <div className="border-t border-stone-200/80 bg-white p-3 dark:border-white/5 dark:bg-stone-900">
+                        {isComplaintConversation(activeConv) && (
+                          <div className="mb-2 flex items-center gap-1.5 text-[9.5px] font-semibold text-red-600 dark:text-red-400">
+                            <Shield size={12} />
+                            คำตอบนี้จะเห็นเฉพาะผู้ร้องเรียนคนนี้เท่านั้น
+                          </div>
+                        )}
+                        <form onSubmit={handleSendText} className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={inputText}
+                            onChange={handleInputChange}
+                            disabled={activeConv.status !== "active"}
+                            placeholder={activeConv.status === "closed" ? "เรื่องนี้ถูกทำเครื่องหมายว่าแก้ไขแล้ว" : "พิมพ์คำตอบในนามแอดมิน..."}
+                            className="w-full rounded-xl border border-stone-200 bg-stone-50 px-3 py-2.5 text-xs text-stone-900 outline-none focus:border-[#16A34A] disabled:opacity-50 dark:border-white/5 dark:bg-stone-950/60 dark:text-white"
+                          />
+                          <button
+                            type="submit"
+                            disabled={activeConv.status !== "active" || !inputText.trim()}
+                            className="flex-shrink-0 rounded-xl bg-[#16A34A] p-2.5 text-white transition-all hover:scale-105 active:scale-95 disabled:cursor-not-allowed disabled:opacity-40"
+                            title="ส่งคำตอบ"
+                          >
+                            <Send size={15} />
+                          </button>
+                        </form>
+                      </div>
                     </div>
                   ) : (
                     <div className="flex-grow flex flex-col items-center justify-center p-6 text-center text-stone-400">
-                      <MessageSquare size={36} className="text-[#16A34A]/50 mb-3 animate-pulse" />
-                      <h4 className="text-xs font-bold text-stone-600 dark:text-stone-400">เลือกห้องแชทของคนในชุมชน</h4>
-                      <p className="text-[10px] text-stone-500 max-w-xs mt-1 leading-relaxed">เข้าตรวจสอบบทสนทนาที่กำลังเกิดขึ้นสด ๆ เพื่อป้องกันสแปมหรือลิงก์มัลแวร์พรีเซ็ตแอบอ้าง</p>
+                      {adminTab === "complaints" ? (
+                        <>
+                          <AlertTriangle size={36} className="text-red-400/60 mb-3 animate-pulse" />
+                          <h4 className="text-xs font-bold text-stone-600 dark:text-stone-400">เลือกเรื่องร้องเรียนที่ต้องการตรวจสอบ</h4>
+                          <p className="text-[10px] text-stone-500 max-w-xs mt-1 leading-relaxed">แอดมินสามารถตอบกลับผู้ร้องเรียนและทำเครื่องหมายว่าแก้ไขแล้วได้จากหน้านี้</p>
+                        </>
+                      ) : (
+                        <>
+                          <MessageSquare size={36} className="text-[#16A34A]/50 mb-3 animate-pulse" />
+                          <h4 className="text-xs font-bold text-stone-600 dark:text-stone-400">เลือกห้องแชทของคนในชุมชน</h4>
+                          <p className="text-[10px] text-stone-500 max-w-xs mt-1 leading-relaxed">เข้าตรวจสอบบทสนทนาที่กำลังเกิดขึ้นสด ๆ เพื่อป้องกันสแปมหรือลิงก์มัลแวร์พรีเซ็ตแอบอ้าง</p>
+                        </>
+                      )}
                     </div>
                   )}
                 </div>
@@ -913,12 +1269,35 @@ export default function CommunityChat({
                 </div>
               </div>
 
+              {/* Customer complaint shortcut */}
+              {!user.role.startsWith("seller") && (
+                <div className="border-b border-stone-200/40 bg-white p-3 dark:border-white/5 dark:bg-[#1A1612]">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setComplaintError("");
+                      setComplaintFormOpen(true);
+                    }}
+                    className="flex w-full items-center gap-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-left transition-all hover:-translate-y-0.5 hover:border-red-300 hover:shadow-md dark:border-red-950/50 dark:bg-red-950/20 dark:hover:border-red-900"
+                  >
+                    <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-red-600 text-white shadow-md shadow-red-600/20">
+                      <AlertTriangle size={17} />
+                    </div>
+                    <div className="min-w-0">
+                      <div className="text-[11.5px] font-black text-red-700 dark:text-red-300">ร้องเรียน / แจ้งปัญหา</div>
+                      <div className="mt-0.5 text-[9.5px] text-stone-500 dark:text-stone-400">ส่งข้อความส่วนตัวถึงแอดมินเทศบาล</div>
+                    </div>
+                  </button>
+                </div>
+              )}
+
               {/* Chat Item List */}
               <div className="flex-grow overflow-y-auto divide-y divide-stone-100 dark:divide-white/5">
                 {filteredConvs.length > 0 ? (
                   filteredConvs.map((c) => {
                     const isSellerView = user.role.startsWith("seller");
-                    const displayName = isSellerView ? c.customerName : c.shopName;
+                    const isComplaint = isComplaintConversation(c);
+                    const displayName = isComplaint ? "ศูนย์รับเรื่องร้องเรียน" : isSellerView ? c.customerName : c.shopName;
                     const avatar = isSellerView ? c.customerAvatar : c.shopLogo;
                     const isBlocked = c.status === "blocked";
                     const hasUnread = c.unreadCount > 0;
@@ -929,7 +1308,9 @@ export default function CommunityChat({
                         onClick={() => selectConversation(c)}
                         className={`w-full p-4 text-left flex items-start gap-3 cursor-pointer transition-all ${
                           activeConv?.id === c.id 
-                            ? "bg-[#16A34A]/5 dark:bg-[#16A34A]/10 border-l-4 border-[#16A34A]" 
+                            ? isComplaint
+                              ? "bg-red-50 dark:bg-red-950/10 border-l-4 border-red-500"
+                              : "bg-[#16A34A]/5 dark:bg-[#16A34A]/10 border-l-4 border-[#16A34A]" 
                             : "hover:bg-stone-50 dark:hover:bg-[#1D1714]"
                         }`}
                       >
@@ -937,7 +1318,7 @@ export default function CommunityChat({
                           <img 
                             src={avatar} 
                             alt={displayName} 
-                            className="w-9 h-9 rounded-full object-cover border border-stone-200/40 dark:border-white/5"
+                            className={`w-9 h-9 rounded-full object-cover border ${isComplaint ? "border-red-300 dark:border-red-900" : "border-stone-200/40 dark:border-white/5"}`}
                             referrerPolicy="no-referrer"
                           />
                           {/* Live/Online indicators */}
@@ -965,6 +1346,18 @@ export default function CommunityChat({
                               </span>
                             )}
                           </div>
+
+                          {isComplaint && c.status === "active" && (
+                            <span className="inline-block mt-1 text-[8.5px] bg-red-100 dark:bg-red-950/40 text-red-600 dark:text-red-400 px-1.5 py-0.5 rounded-md font-extrabold tracking-wide">
+                              กำลังรอการตรวจสอบ
+                            </span>
+                          )}
+
+                          {isComplaint && c.status === "closed" && (
+                            <span className="inline-block mt-1 text-[8.5px] bg-emerald-100 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 px-1.5 py-0.5 rounded-md font-extrabold tracking-wide">
+                              ✓ แก้ไขแล้ว
+                            </span>
+                          )}
 
                           {isBlocked && (
                             <span className="inline-block mt-1 text-[8.5px] bg-red-100 dark:bg-red-950/40 text-red-600 px-1.5 py-0.5 rounded-md font-extrabold tracking-wide uppercase">
@@ -1007,18 +1400,24 @@ export default function CommunityChat({
 
                       <img 
                         src={user.role.startsWith("seller") ? activeConv.customerAvatar : activeConv.shopLogo} 
-                        alt="Profile" 
-                        className="w-8 h-8 rounded-full object-cover border border-stone-200/40 dark:border-white/5 flex-shrink-0"
+                        alt={isComplaintConversation(activeConv) ? "ศูนย์รับเรื่องร้องเรียน" : "Profile"}
+                        className={`w-8 h-8 rounded-full object-cover border flex-shrink-0 ${isComplaintConversation(activeConv) ? "border-red-300 dark:border-red-900" : "border-stone-200/40 dark:border-white/5"}`}
                         referrerPolicy="no-referrer"
                       />
 
                       <div className="min-w-0">
                         <h4 className="text-xs font-black text-stone-900 dark:text-stone-100 truncate">
-                          {user.role.startsWith("seller") ? activeConv.customerName : activeConv.shopName}
+                          {isComplaintConversation(activeConv)
+                            ? "ศูนย์รับเรื่องร้องเรียน"
+                            : user.role.startsWith("seller")
+                              ? activeConv.customerName
+                              : activeConv.shopName}
                         </h4>
                         <div className="flex items-center gap-1">
-                          <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                          <span className="text-[9px] text-stone-400 font-bold tracking-wide uppercase">ออนไลน์บนระบบ</span>
+                          <span className={`w-1.5 h-1.5 rounded-full ${isComplaintConversation(activeConv) ? "bg-red-500" : "bg-emerald-500"} animate-pulse`} />
+                          <span className="text-[9px] text-stone-400 font-bold tracking-wide uppercase">
+                            {isComplaintConversation(activeConv) ? "ห้องส่วนตัวกับแอดมิน" : "ออนไลน์บนระบบ"}
+                          </span>
                         </div>
                       </div>
                     </div>
@@ -1086,7 +1485,7 @@ export default function CommunityChat({
                               }`}>
                                 {/* Message content renderer */}
                                 {m.messageType === "text" && (
-                                  <p className="text-[11px] font-medium leading-relaxed font-sans">{m.message}</p>
+                                  <p className="whitespace-pre-wrap text-[11px] font-medium leading-relaxed font-sans">{m.message}</p>
                                 )}
 
                                 {m.messageType === "image" && m.image && (
@@ -1210,9 +1609,19 @@ export default function CommunityChat({
                       })
                     ) : (
                       <div className="h-full flex flex-col items-center justify-center p-6 text-center text-stone-400">
-                        <Smile size={32} className="text-stone-300 dark:text-stone-800 mb-2" />
-                        <h5 className="text-xs font-bold text-stone-500">{lang === "th" ? "เริ่มสนทนาใหม่" : "No Messages Yet"}</h5>
-                        <p className="text-[10px] text-stone-400 max-w-xs mt-1">พิมพ์ข้อความเพื่อสอบถามรายละเอียดสินค้าบาติกและผลิตภัณฑ์ทอใบลานพรีเมียมจากคุณลุงป้าในตำบลได้เลยค่ะ</p>
+                        {isComplaintConversation(activeConv) ? (
+                          <>
+                            <AlertTriangle size={32} className="text-red-300 dark:text-red-900 mb-2" />
+                            <h5 className="text-xs font-bold text-stone-500">เริ่มต้นเรื่องร้องเรียน</h5>
+                            <p className="text-[10px] text-stone-400 max-w-xs mt-1">แจ้งรายละเอียดปัญหาและแนบรูปหลักฐานได้ แอดมินจะตอบกลับในห้องส่วนตัวนี้</p>
+                          </>
+                        ) : (
+                          <>
+                            <Smile size={32} className="text-stone-300 dark:text-stone-800 mb-2" />
+                            <h5 className="text-xs font-bold text-stone-500">{lang === "th" ? "เริ่มสนทนาใหม่" : "No Messages Yet"}</h5>
+                            <p className="text-[10px] text-stone-400 max-w-xs mt-1">พิมพ์ข้อความเพื่อสอบถามรายละเอียดสินค้าบาติกและผลิตภัณฑ์ทอใบลานพรีเมียมจากคุณลุงป้าในตำบลได้เลยค่ะ</p>
+                          </>
+                        )}
                       </div>
                     )}
 
@@ -1507,6 +1916,7 @@ export default function CommunityChat({
                           placeholder={
                             activeConv.status === "blocked" ? "ห้องแชทนี้ถูกปิดกั้นชั่วคราว" : 
                             activeConv.status === "closed" ? "ห้องสนทนาปิดการสนทนาแล้ว" :
+                            isComplaintConversation(activeConv) ? "พิมพ์ข้อความเพิ่มเติมถึงแอดมิน..." :
                             lang === "th" ? "พิมพ์ข้อความแชทส่งที่นี่..." : "Type your message here..."
                           }
                           className="w-full bg-stone-50 dark:bg-[#201B17] text-stone-900 dark:text-white rounded-xl border border-stone-200 dark:border-white/5 p-2 px-3 focus:outline-none focus:border-[#16A34A] text-xs leading-normal disabled:opacity-50"
@@ -1540,41 +1950,45 @@ export default function CommunityChat({
                             <span className="font-extrabold text-stone-700 dark:text-stone-300">แนบรูปภาพ</span>
                           </button>
 
-                          {/* Recommendation Product */}
-                          <button
-                            onClick={() => { setProductPickerOpen(true); setImageFormOpen(false); setOrderFormOpen(false); setLocationFormOpen(false); setSlipFormOpen(false); }}
-                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-stone-200 dark:border-white/5 hover:border-[#16A34A] hover:bg-[#16A34A]/5 transition-all text-center space-y-1 cursor-pointer"
-                          >
-                            <ShoppingBag size={15} className="text-amber-600" />
-                            <span className="font-extrabold text-stone-700 dark:text-stone-300">แนะนำสินค้า</span>
-                          </button>
+                          {!isComplaintConversation(activeConv) && (
+                            <>
+                              {/* Recommendation Product */}
+                              <button
+                                onClick={() => { setProductPickerOpen(true); setImageFormOpen(false); setOrderFormOpen(false); setLocationFormOpen(false); setSlipFormOpen(false); }}
+                                className="flex flex-col items-center justify-center p-2 rounded-xl border border-stone-200 dark:border-white/5 hover:border-[#16A34A] hover:bg-[#16A34A]/5 transition-all text-center space-y-1 cursor-pointer"
+                              >
+                                <ShoppingBag size={15} className="text-amber-600" />
+                                <span className="font-extrabold text-stone-700 dark:text-stone-300">แนะนำสินค้า</span>
+                              </button>
 
-                          {/* Invoice / Bill (For Sellers mostly, but anyone can trigger) */}
-                          <button
-                            onClick={() => { setOrderFormOpen(true); setImageFormOpen(false); setProductPickerOpen(false); setLocationFormOpen(false); setSlipFormOpen(false); }}
-                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-stone-200 dark:border-white/5 hover:border-[#16A34A] hover:bg-[#16A34A]/5 transition-all text-center space-y-1 cursor-pointer"
-                          >
-                            <FileText size={15} className="text-blue-600" />
-                            <span className="font-extrabold text-stone-700 dark:text-stone-300">เปิดบิล/สั่งซื้อ</span>
-                          </button>
+                              {/* Invoice / Bill (For Sellers mostly, but anyone can trigger) */}
+                              <button
+                                onClick={() => { setOrderFormOpen(true); setImageFormOpen(false); setProductPickerOpen(false); setLocationFormOpen(false); setSlipFormOpen(false); }}
+                                className="flex flex-col items-center justify-center p-2 rounded-xl border border-stone-200 dark:border-white/5 hover:border-[#16A34A] hover:bg-[#16A34A]/5 transition-all text-center space-y-1 cursor-pointer"
+                              >
+                                <FileText size={15} className="text-blue-600" />
+                                <span className="font-extrabold text-stone-700 dark:text-stone-300">เปิดบิล/สั่งซื้อ</span>
+                              </button>
 
-                          {/* Share Map coordinates */}
-                          <button
-                            onClick={() => { setLocationFormOpen(true); setImageFormOpen(false); setProductPickerOpen(false); setOrderFormOpen(false); setSlipFormOpen(false); }}
-                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-stone-200 dark:border-white/5 hover:border-[#16A34A] hover:bg-[#16A34A]/5 transition-all text-center space-y-1 cursor-pointer"
-                          >
-                            <MapPin size={15} className="text-red-600" />
-                            <span className="font-extrabold text-stone-700 dark:text-stone-300">แนบตำแหน่ง</span>
-                          </button>
+                              {/* Share Map coordinates */}
+                              <button
+                                onClick={() => { setLocationFormOpen(true); setImageFormOpen(false); setProductPickerOpen(false); setOrderFormOpen(false); setSlipFormOpen(false); }}
+                                className="flex flex-col items-center justify-center p-2 rounded-xl border border-stone-200 dark:border-white/5 hover:border-[#16A34A] hover:bg-[#16A34A]/5 transition-all text-center space-y-1 cursor-pointer"
+                              >
+                                <MapPin size={15} className="text-red-600" />
+                                <span className="font-extrabold text-stone-700 dark:text-stone-300">แนบตำแหน่ง</span>
+                              </button>
 
-                          {/* Payment Slip confirm */}
-                          <button
-                            onClick={() => { setSlipFormOpen(true); setImageFormOpen(false); setProductPickerOpen(false); setOrderFormOpen(false); setLocationFormOpen(false); }}
-                            className="flex flex-col items-center justify-center p-2 rounded-xl border border-stone-200 dark:border-white/5 hover:border-[#16A34A] hover:bg-[#16A34A]/5 transition-all text-center space-y-1 cursor-pointer col-span-3 sm:col-span-1"
-                          >
-                            <CheckCheck size={15} className="text-emerald-500" />
-                            <span className="font-extrabold text-stone-700 dark:text-stone-300">ส่งสลิปโอนเงิน</span>
-                          </button>
+                              {/* Payment Slip confirm */}
+                              <button
+                                onClick={() => { setSlipFormOpen(true); setImageFormOpen(false); setProductPickerOpen(false); setOrderFormOpen(false); setLocationFormOpen(false); }}
+                                className="flex flex-col items-center justify-center p-2 rounded-xl border border-stone-200 dark:border-white/5 hover:border-[#16A34A] hover:bg-[#16A34A]/5 transition-all text-center space-y-1 cursor-pointer col-span-3 sm:col-span-1"
+                              >
+                                <CheckCheck size={15} className="text-emerald-500" />
+                                <span className="font-extrabold text-stone-700 dark:text-stone-300">ส่งสลิปโอนเงิน</span>
+                              </button>
+                            </>
+                          )}
                         </motion.div>
                       )}
                     </AnimatePresence>
