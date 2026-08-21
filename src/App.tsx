@@ -19,6 +19,7 @@ import CartModal from "./components/CartModal";
 import RecommendedSlider from "./components/RecommendedSlider";
 import RecentOrdersMarquee from "./components/RecentOrdersMarquee";
 import SeasonalEffects from "./components/SeasonalEffects";
+import TextReader from "./components/TextReader";
 
 
 // Icons
@@ -703,6 +704,7 @@ export default function App() {
         backgroundPosition: 'center'
       } : undefined}
       id="shop-app"
+      data-reader-content="true"
     >
       
       {/* If there is a custom background image, add a subtle, semi-transparent blur and dark/light overlay to keep text perfectly legible */}
@@ -1751,7 +1753,7 @@ export default function App() {
           </div>
         </>
       )}
-
+      <TextReader />
     </div>
   );
 }
