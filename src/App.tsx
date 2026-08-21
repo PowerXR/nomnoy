@@ -1282,7 +1282,97 @@ export default function App() {
               </div>
             </div>
           </section>
+{/* คำถามที่พบบ่อย FAQ */}
+<section
+  id="faq-section"
+  className="mx-auto max-w-4xl px-4 py-12 sm:px-6 lg:px-8"
+>
+  <div className="mb-8 text-center">
+    <span className="text-xs font-bold uppercase tracking-widest text-[#8E6D4E]">
+      FAQ
+    </span>
 
+    <h2 className="mt-2 text-2xl font-bold text-[#4E3B2C] dark:text-[#E2C7A9]">
+      คำถามที่พบบ่อย
+    </h2>
+
+    <p className="mt-2 text-sm text-stone-500 dark:text-stone-400">
+      กดที่คำถามเพื่อเปิดหรือปิดคำตอบ
+    </p>
+  </div>
+
+  <div className="space-y-3">
+    <details className="group rounded-2xl border border-[#8E6D4E]/20 bg-white dark:bg-[#1A1613]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-semibold text-[#4E3B2C] dark:text-[#E2C7A9]">
+        ต้องสมัครสมาชิกก่อนสั่งซื้อหรือไม่?
+        <span className="text-xl text-[#8E6D4E] transition-transform group-open:rotate-180">
+          ⌄
+        </span>
+      </summary>
+
+      <div className="border-t border-[#8E6D4E]/10 px-5 py-4 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+        จำเป็นต้องสมัครสมาชิกและเข้าสู่ระบบก่อนสั่งซื้อ
+        เพื่อให้สามารถตรวจสอบประวัติและสถานะคำสั่งซื้อได้
+      </div>
+    </details>
+
+    <details className="group rounded-2xl border border-[#8E6D4E]/20 bg-white dark:bg-[#1A1613]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-semibold text-[#4E3B2C] dark:text-[#E2C7A9]">
+        สามารถชำระเงินด้วยวิธีใดได้บ้าง?
+        <span className="text-xl text-[#8E6D4E] transition-transform group-open:rotate-180">
+          ⌄
+        </span>
+      </summary>
+
+      <div className="border-t border-[#8E6D4E]/10 px-5 py-4 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+        สามารถเติมเงินผ่าน QR พร้อมเพย์หรือช่องทางชำระเงินที่เว็บไซต์กำหนด
+        จากนั้นจึงใช้ยอดเงินในบัญชีชำระค่าสินค้า
+      </div>
+    </details>
+
+    <details className="group rounded-2xl border border-[#8E6D4E]/20 bg-white dark:bg-[#1A1613]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-semibold text-[#4E3B2C] dark:text-[#E2C7A9]">
+        ตรวจสอบคำสั่งซื้อได้จากที่ไหน?
+        <span className="text-xl text-[#8E6D4E] transition-transform group-open:rotate-180">
+          ⌄
+        </span>
+      </summary>
+
+      <div className="border-t border-[#8E6D4E]/10 px-5 py-4 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+        เข้าสู่ระบบแล้วเลือกเมนูประวัติการสั่งซื้อ
+        เพื่อดูรายละเอียด สถานะ และเลขติดตามพัสดุ
+      </div>
+    </details>
+
+    <details className="group rounded-2xl border border-[#8E6D4E]/20 bg-white dark:bg-[#1A1613]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-semibold text-[#4E3B2C] dark:text-[#E2C7A9]">
+        ใช้คูปองส่วนลดอย่างไร?
+        <span className="text-xl text-[#8E6D4E] transition-transform group-open:rotate-180">
+          ⌄
+        </span>
+      </summary>
+
+      <div className="border-t border-[#8E6D4E]/10 px-5 py-4 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+        กรอกรหัสคูปองในหน้าตะกร้าสินค้าก่อนยืนยันการสั่งซื้อ
+        ระบบจะคำนวณส่วนลดให้อัตโนมัติ
+      </div>
+    </details>
+
+    <details className="group rounded-2xl border border-[#8E6D4E]/20 bg-white dark:bg-[#1A1613]">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 p-5 font-semibold text-[#4E3B2C] dark:text-[#E2C7A9]">
+        หากพบปัญหาต้องติดต่อใคร?
+        <span className="text-xl text-[#8E6D4E] transition-transform group-open:rotate-180">
+          ⌄
+        </span>
+      </summary>
+
+      <div className="border-t border-[#8E6D4E]/10 px-5 py-4 text-sm leading-relaxed text-stone-600 dark:text-stone-300">
+        สามารถกดปุ่มแชตบนเว็บไซต์เพื่อติดต่อแอดมิน
+        หรือเลือกช่องทาง Facebook และ LINE ที่ด้านล่างเว็บไซต์
+      </div>
+    </details>
+  </div>
+</section>
           {/* Interactive Map of Nam Noi Subdistrict Municipality */}
           <NamNoiMap settings={settings} lang={lang} />
 
