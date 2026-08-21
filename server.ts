@@ -2805,7 +2805,61 @@ CREATE TABLE IF NOT EXISTS reviews (
 
     res.json(conv);
   });
+app.post("/api/chat/admin-support", (req, res) => {
+  const customerId = req.headers["x-user-id"] as string;
 
+  if (!customerId) {
+    return res.status(401).json({ error: "กรุณาเข้าสู่ระบบก่อนส่งเรื่องร้องเรียน" });
+  }
+
+  const customer = db.users.find((item: any) => item.id === customerId);
+  if (!customer) {
+    return res.status(404).json({ error: "ไม่พบบัญชีผู้ใช้ในระบบ" });
+  }
+
+  if (customer.role === "admin") {
+    return res.status(400).json({ error: "บัญชีแอดมินไม่สามารถสร้างเรื่องร้องเรียนถึงตนเองได้" });
+  }
+
+  // ค้นหาจาก role ทุกครั้ง จึงไม่ต้องเดาหรือ hardcode รหัสบัญชีแอดมิน
+  const admin = db.users.find((item: any) => item.role === "admin");
+  if (!admin) {
+    return res.status(503).json({ error: "ยังไม่พบบัญชีแอดมิน กรุณาติดต่อผู้ดูแลระบบ" });
+  }
+
+  const supportShopId = "admin-support";
+  let conversation = db.conversations.find(
+    (item: any) =>
+      item.customerId === customerId &&
+      item.sellerId === admin.id &&
+      item.shopId === supportShopId
+  );
+
+  if (!conversation) {
+    const createdAt = new Date().toISOString();
+
+    conversation = {
+      id: `conv_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+      customerId,
+      sellerId: admin.id,
+      shopId: supportShopId,
+      lastMessage: "เปิดเรื่องร้องเรียนถึงแอดมิน",
+      lastMessageAt: createdAt,
+      status: "active",
+      createdAt
+    };
+
+    db.conversations.push(conversation);
+    saveDB(db);
+  } else if (conversation.status === "closed") {
+    // ถ้าผู้ใช้ส่งเรื่องใหม่หลังเรื่องเดิมจบ ให้เปิดห้องอีกครั้งอัตโนมัติ
+    conversation.status = "active";
+    conversation.lastMessageAt = new Date().toISOString();
+    saveDB(db);
+  }
+
+  return res.json(conversation);
+});
   // GET Messages in a specific conversation
   app.get("/api/chat/conversations/:id/messages", (req, res) => {
     const userId = req.headers["x-user-id"] as string;
