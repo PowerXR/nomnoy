@@ -122,12 +122,19 @@ export interface User {
   username: string;
   email: string;
   balance: number;
-  role: 'user' | 'admin' | 'seller_internal' | 'seller_external';
+  role:
+    | 'user'
+    | 'admin'
+    | 'seller_internal'
+    | 'seller_external';
   discordId?: string;
   avatarUrl?: string;
   password?: string;
   pendingBalance?: number;
   withdrawableBalance?: number;
+
+  // Token ยืนยันตัวตนจากเซิร์ฟเวอร์
+  authToken?: string;
 }
 
 export interface Coupon {
@@ -141,11 +148,25 @@ export interface Transaction {
   id: string;
   userId: string;
   username: string;
-  type: 'topup_qr' | 'topup_angpao' | 'purchase_product' | 'purchase_box';
+  type:
+    | 'topup_qr'
+    | 'topup_angpao'
+    | 'purchase_product'
+    | 'purchase_box';
   amount: number;
   details: string;
   status: 'pending' | 'success' | 'failed';
   date: string;
+
+  productId?: string;
+
+  orderItems?: {
+    productId: string;
+    productName: string;
+    quantity: number;
+    price: number;
+  }[];
+
   shippingDetails?: {
     name: string;
     phone: string;
@@ -154,21 +175,37 @@ export interface Transaction {
     method: string;
     fee: number;
   };
-  orderStatus?: 'preparing' | 'shipped' | 'delivered' | 'cancelled';
+
+  orderStatus?:
+    | 'preparing'
+    | 'shipped'
+    | 'delivered'
+    | 'cancelled';
+
   trackingNumber?: string;
   trackingCarrier?: string;
-  statusUpdates?: { status: string; date: string; note?: string }[];
+
+  statusUpdates?: {
+    status: string;
+    date: string;
+    note?: string;
+    productIds?: string[];
+  }[];
 }
 
 export interface Review {
   id: string;
   userId: string;
   username: string;
-  rating: number; // 1 to 5
+  rating: number;
   productId: string;
   productName: string;
   comment: string;
   date: string;
+
+  // เซิร์ฟเวอร์เป็นผู้กำหนด ห้ามรับค่าจากผู้ใช้โดยตรง
+  verifiedPurchase?: boolean;
+  purchaseDate?: string;
 }
 
 export interface Conversation {

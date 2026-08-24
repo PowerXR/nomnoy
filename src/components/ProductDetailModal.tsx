@@ -3,6 +3,7 @@ import { Product, AppSettings, Coupon, Review, User } from "../types";
 import { X, Calendar, MessageSquare, ShieldAlert, Star, AlertCircle, ShoppingCart, Ticket, Sparkles, Check, Heart, Feather, Youtube, Video } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { Language, getTranslation, getTranslatedProduct } from "../lib/translations";
+import VerifiedReviews from "./VerifiedReviews";
 
 function getYouTubeId(url: string | undefined): string | null {
   if (!url) return null;
@@ -26,6 +27,11 @@ interface ProductDetailModalProps {
   lang?: Language;
   onChatWithSeller?: (sellerId: string) => void;
   onAddToCart?: (productId: string, quantity: number) => void;
+    onAddReview: (
+    productId: string,
+    rating: number,
+    comment: string
+  ) => Promise<Review>;
 }
 
 export default function ProductDetailModal({
@@ -37,7 +43,8 @@ export default function ProductDetailModal({
   onPurchase,
   lang = "th",
   onChatWithSeller,
-  onAddToCart
+  onAddToCart,
+  onAddReview,
 }: ProductDetailModalProps) {
   const product = getTranslatedProduct(originalProduct, lang);
   const youtubeVideoId = getYouTubeId(originalProduct.videoUrl);
@@ -258,13 +265,19 @@ export default function ProductDetailModal({
                   <span>{getTranslation(lang, "reviewsTab").replace("{count}", String(productReviews.length))}</span>
                   <div className="flex items-center text-amber-550 text-[10px]">
                     <Star size={10} className="fill-current text-amber-500" />
-                    <span className="ml-0.5 text-stone-600 dark:text-stone-300">{productReviews.length > 0 ? (productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length).toFixed(1) : "5.0"}</span>
+                    <span className="ml-0.5 text-stone-600 dark:text-stone-300">{productReviews.length > 0 ? (productReviews.reduce((sum, r) => sum + r.rating, 0) / productReviews.length).toFixed(1) : "0.0"}</span>
                   </div>
                 </button>
               </div>
 
               {/* Tab content renderer */}
-              <div className="max-h-52 overflow-y-auto pr-2 mb-4">
+              <div
+  className={`${
+    activeTab === "reviews"
+      ? "max-h-[30rem]"
+      : "max-h-52"
+  } overflow-y-auto pr-2 mb-4`}
+>
                 {activeTab === "details" && (
                   <div className="text-xs text-stone-600 dark:text-stone-300 space-y-3 mt-1 leading-relaxed whitespace-pre-line font-light">
                     {product.details ? (
@@ -307,26 +320,13 @@ export default function ProductDetailModal({
                 )}
 
                 {activeTab === "reviews" && (
-                  <div className="space-y-3 mt-1">
-                    {productReviews.length === 0 ? (
-                      <div className="text-center py-6 text-stone-400 text-xs font-light">{getTranslation(lang, "noReviewsYet")}</div>
-                    ) : (
-                      productReviews.map((rev) => (
-                        <div key={rev.id} className="p-4 rounded-2xl bg-white dark:bg-[#151210] border border-[#8E6D4E]/10 space-y-1.5 shadow-sm">
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-[#4E3B2C] dark:text-slate-200">{rev.username}</span>
-                            <div className="flex text-amber-500">
-                              {Array.from({ length: 5 }).map((_, i) => (
-                                <Star key={i} size={10} className={i < rev.rating ? "fill-current" : "opacity-25"} />
-                              ))}
-                            </div>
-                          </div>
-                          <p className="text-xs text-stone-500 dark:text-stone-400 font-light">{rev.comment}</p>
-                          <span className="text-[9px] text-stone-400 block">{new Date(rev.date).toLocaleDateString(lang === "zh" ? "zh-CN" : lang === "en" ? "en-US" : "th-TH")}</span>
-                        </div>
-                      ))
-                    )}
-                  </div>
+                  <VerifiedReviews
+                    product={originalProduct}
+                    user={user}
+                    reviews={reviews}
+                    lang={lang}
+                    onAddReview={onAddReview}
+                  />
                 )}
               </div>
             </div>

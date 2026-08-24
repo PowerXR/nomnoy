@@ -17,9 +17,11 @@ import { MessageSquare } from "lucide-react";
 import NamNoiMap from "./components/NamNoiMap";
 import CartModal from "./components/CartModal";
 import RecommendedSlider from "./components/RecommendedSlider";
+import ReviewShowcase from "./components/ReviewShowcase";
 import RecentOrdersMarquee from "./components/RecentOrdersMarquee";
 import SeasonalEffects from "./components/SeasonalEffects";
 import TextReader from "./components/TextReader";
+import CommunityChat from "./components/CommunityChat";
 
 
 // Icons
@@ -294,17 +296,40 @@ export default function App() {
   };
 
   // Update current user balance or attributes
-  const refreshUserSession = async (userId: string) => {
-    const data = await safeFetch(`/api/users/me/${userId}`);
-    if (data) {
-      setUser(data);
-      return data;
-    } else {
-      localStorage.removeItem("userId");
-      return null;
-    }
-  };
+  const refreshUserSession = async (
+    userId: string
+  ) => {
+    const savedAuthToken =
+      localStorage.getItem("authToken");
 
+    const data = await safeFetch(
+      `/api/users/me/${userId}`,
+      {
+        headers: savedAuthToken
+          ? {
+              Authorization: `Bearer ${savedAuthToken}`,
+            }
+          : undefined,
+      }
+    );
+
+    if (data) {
+      const nextUser: User = {
+        ...data,
+        authToken:
+          data.authToken ||
+          savedAuthToken ||
+          undefined,
+      };
+
+      setUser(nextUser);
+      return nextUser;
+    }
+
+    localStorage.removeItem("userId");
+    localStorage.removeItem("authToken");
+    return null;
+  };
   useEffect(() => {
     const initSessionAndLoad = async () => {
       const savedUserId = localStorage.getItem("userId");
@@ -356,9 +381,22 @@ export default function App() {
     }, 500);
   };
 
-  const handleLoginSuccess = (loggedInUser: User) => {
+  const handleLoginSuccess = (
+    loggedInUser: User
+  ) => {
     setUser(loggedInUser);
-    localStorage.setItem("userId", loggedInUser.id);
+
+    localStorage.setItem(
+      "userId",
+      loggedInUser.id
+    );
+
+    if (loggedInUser.authToken) {
+      localStorage.setItem(
+        "authToken",
+        loggedInUser.authToken
+      );
+    }
     
     // If there is an active announcement, show it upon login
     if (settings && settings.announcementActive) {
@@ -378,6 +416,7 @@ export default function App() {
   const handleLogout = () => {
     setUser(null);
     localStorage.removeItem("userId");
+    localStorage.removeItem("authToken");
     triggerSwal(
       getTranslation(lang, "logoutSuccess"),
       getTranslation(lang, "logoutMsg"),
@@ -591,23 +630,66 @@ export default function App() {
   };
 
   // Write catalog product review
-  const handleAddReview = async (productId: string, rating: number, comment: string) => {
-    if (!user) return;
-    try {
-      const res = await fetch("/api/reviews", {
+   // ส่งรีวิวจากผู้ซื้อจริง
+  const handleAddReview = async (
+    productId: string,
+    rating: number,
+    comment: string
+  ): Promise<Review> => {
+    if (!user) {
+      throw new Error(
+        "กรุณาเข้าสู่ระบบก่อนเขียนรีวิว"
+      );
+    }
+
+    const authToken =
+      user.authToken ||
+      localStorage.getItem("authToken");
+
+    if (!authToken) {
+      throw new Error(
+        "กรุณาออกจากระบบแล้วเข้าสู่ระบบใหม่ เพื่อยืนยันสิทธิ์ผู้ซื้อจริง"
+      );
+    }
+
+    const response = await fetch(
+      "/api/reviews",
+      {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
-          "X-User-Id": user.id
+          "Content-Type":
+            "application/json",
+          Authorization:
+            `Bearer ${authToken}`,
         },
-        body: JSON.stringify({ productId, rating, comment })
-      });
-      if (res.ok) {
-        loadStoreData();
+        body: JSON.stringify({
+          productId,
+          rating,
+          comment,
+        }),
       }
-    } catch (err) {
-      console.error(err);
+    );
+
+    const text = await response.text();
+
+    let data: any = null;
+
+    try {
+      data = text ? JSON.parse(text) : null;
+    } catch {
+      data = null;
     }
+
+    if (!response.ok) {
+      throw new Error(
+        data?.error ||
+          "ไม่สามารถส่งรีวิวได้ กรุณาลองใหม่อีกครั้ง"
+      );
+    }
+
+    await loadStoreData();
+
+    return data as Review;
   };
 
   // Save modified Settings (Admin)
@@ -1154,7 +1236,14 @@ export default function App() {
               recommendSubtitle={settings.recommendSubtitle}
             />
           )}
-
+          {/* รีวิวรวมจากผู้ซื้อจริง แยกตามสินค้า */}
+          <ReviewShowcase
+            products={products}
+            reviews={reviews}
+            user={user}
+            lang={lang}
+            onAddReview={handleAddReview}
+          />
           {/* Main Grid Categories And Product listing */}
           <CategoriesAndProducts 
             categories={categories}
@@ -1472,6 +1561,7 @@ export default function App() {
                   setChatOpen(true);
                 }}
                 onAddToCart={handleAddToCart}
+                onAddReview={handleAddReview}
               />
             )}
 

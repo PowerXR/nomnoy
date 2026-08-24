@@ -2015,4 +2015,4 @@ export default function CommunityChat({
       </motion.div>
     </div>
   );
-}
+  }

@@ -7,7 +7,7 @@ import { AppSettings, Category, Product, User, Coupon, Transaction, Review, BoxI
 import { loadFromPrisma, saveToPrisma } from "./src/lib/prisma-sync";
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 
 
 const supabaseStorage = createClient(
@@ -24,6 +24,78 @@ const supabaseStorage = createClient(
 
 // Database storage setup
 const DB_FILE = path.join(process.cwd(), "db.json");
+const SESSION_SECRET =
+  process.env.SESSION_SECRET || "change-this-secret-before-production";
+
+const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+
+function createSessionToken(userId: string) {
+  const payload = Buffer.from(
+    JSON.stringify({
+      userId,
+      expiresAt: Date.now() + SESSION_MAX_AGE_MS,
+    })
+  ).toString("base64url");
+
+  const signature = createHmac("sha256", SESSION_SECRET)
+    .update(payload)
+    .digest("base64url");
+
+  return `${payload}.${signature}`;
+}
+
+function readSessionToken(
+  token: string | undefined
+): { userId: string } | null {
+  if (!token) return null;
+
+  const [payload, signature] = token.split(".");
+  if (!payload || !signature) return null;
+
+  try {
+    const expectedSignature = createHmac("sha256", SESSION_SECRET)
+      .update(payload)
+      .digest();
+
+    const receivedSignature = Buffer.from(signature, "base64url");
+
+    if (
+      expectedSignature.length !== receivedSignature.length ||
+      !timingSafeEqual(expectedSignature, receivedSignature)
+    ) {
+      return null;
+    }
+
+    const session = JSON.parse(
+      Buffer.from(payload, "base64url").toString("utf8")
+    );
+
+    if (
+      !session.userId ||
+      !session.expiresAt ||
+      Number(session.expiresAt) <= Date.now()
+    ) {
+      return null;
+    }
+
+    return {
+      userId: String(session.userId),
+    };
+  } catch {
+    return null;
+  }
+}
+
+function getBearerToken(authorization: string | undefined) {
+  if (!authorization?.startsWith("Bearer ")) return undefined;
+
+  return authorization.slice(7).trim() || undefined;
+}
+
+function toPublicUser(user: any) {
+  const { password: _password, ...safeUser } = user;
+  return safeUser;
+}
 
 // Helper to load DB
 async function loadDB() {
@@ -342,6 +414,184 @@ async function startServer() {
   }
   saveDB(db);
 
+  // ตรวจสอบผู้ใช้จาก Token
+  const getAuthenticatedUser = (req: any) => {
+    const token = getBearerToken(
+      req.headers.authorization as string | undefined
+    );
+
+    const session = readSessionToken(token);
+
+    if (!session) return null;
+
+    return (
+      db.users.find(
+        (candidate: any) => candidate.id === session.userId
+      ) || null
+    );
+  };
+
+  // ดึงรหัสสินค้าทั้งหมดออกจากรายการสั่งซื้อ
+  const getTransactionProductIds = (tx: any): string[] => {
+    const productIds = new Set<string>();
+
+    if (typeof tx.productId === "string" && tx.productId) {
+      productIds.add(tx.productId);
+    }
+
+    if (Array.isArray(tx.orderItems)) {
+      tx.orderItems.forEach((item: any) => {
+        if (typeof item?.productId === "string" && item.productId) {
+          productIds.add(item.productId);
+        }
+      });
+    }
+
+    if (Array.isArray(tx.statusUpdates)) {
+      tx.statusUpdates.forEach((update: any) => {
+        if (Array.isArray(update?.productIds)) {
+          update.productIds.forEach((productId: unknown) => {
+            if (typeof productId === "string" && productId) {
+              productIds.add(productId);
+            }
+          });
+        }
+      });
+    }
+
+    // รองรับคำสั่งซื้อเก่าที่ยังไม่มี productId
+    const details =
+      typeof tx.details === "string" ? tx.details : "";
+
+    if (details) {
+      db.products.forEach((product: any) => {
+        if (details.includes(product.name)) {
+          productIds.add(product.id);
+        }
+      });
+    }
+
+    return [...productIds];
+  };
+
+  // ตรวจว่าเป็นรายการซื้อสินค้าหรือไม่
+  const isPurchaseTransaction = (tx: any) =>
+    typeof tx?.type === "string" &&
+    tx.type.startsWith("purchase_");
+
+  // ตรวจว่าสั่งซื้อสำเร็จและได้รับสินค้าแล้ว
+  const getFulfilledAt = (tx: any): number | null => {
+    if (tx.status !== "success" || !isPurchaseTransaction(tx)) {
+      return null;
+    }
+
+    if (tx.orderStatus === "cancelled") {
+      return null;
+    }
+
+    const needsDeliveryConfirmation =
+      Boolean(tx.shippingDetails) || Boolean(tx.orderStatus);
+
+    if (
+      needsDeliveryConfirmation &&
+      tx.orderStatus !== "delivered"
+    ) {
+      return null;
+    }
+
+    const deliveredUpdate = Array.isArray(tx.statusUpdates)
+      ? [...tx.statusUpdates]
+          .reverse()
+          .find((update: any) => update?.status === "delivered")
+      : undefined;
+
+    const fulfilledAt = Date.parse(
+      deliveredUpdate?.date || tx.date
+    );
+
+    return Number.isFinite(fulfilledAt)
+      ? fulfilledAt
+      : Date.now();
+  };
+
+  // ค้นหารายการซื้อของผู้ใช้ที่ตรงกับสินค้า
+  const getMatchingPurchases = (
+    userId: string,
+    productId: string
+  ) =>
+    db.transactions.filter(
+      (tx: any) =>
+        tx.userId === userId &&
+        isPurchaseTransaction(tx) &&
+        getTransactionProductIds(tx).includes(productId)
+    );
+
+  // ค้นหาคำสั่งซื้อที่ผ่านการยืนยันแล้ว
+  const findVerifiedPurchase = (
+    userId: string,
+    productId: string,
+    completedBefore = Date.now()
+  ) =>
+    getMatchingPurchases(userId, productId)
+      .map((tx: any) => ({
+        tx,
+        fulfilledAt: getFulfilledAt(tx),
+      }))
+      .filter(
+        (entry: any) =>
+          entry.fulfilledAt !== null &&
+          entry.fulfilledAt <= completedBefore
+      )
+      .sort(
+        (a: any, b: any) =>
+          b.fulfilledAt - a.fulfilledAt
+      )[0] || null;
+
+  // สร้างข้อมูลรีวิวที่มีตราผู้ซื้อจริง
+  const toVerifiedPublicReview = (review: any) => {
+    const reviewCreatedAt = Date.parse(review.date);
+
+    const purchase = findVerifiedPurchase(
+      review.userId,
+      review.productId,
+      Number.isFinite(reviewCreatedAt)
+        ? reviewCreatedAt
+        : Date.now()
+    );
+
+    if (!purchase) return null;
+
+    return {
+      ...review,
+      verifiedPurchase: true,
+      purchaseDate: purchase.tx.date,
+    };
+  };
+  // สร้างการแจ้งเตือนให้ผู้ใช้
+  const addUserNotification = (
+    userId: string,
+    title: string,
+    body: string
+  ) => {
+    if (!db.notifications) {
+      db.notifications = [];
+    }
+
+    const notification: Notification = {
+      id: `notif-${randomUUID()}`,
+      userId,
+      title,
+      body,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    db.notifications.unshift(
+      notification
+    );
+
+    return notification;
+  };
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
@@ -710,81 +960,179 @@ async function startServer() {
 
   // Create User (Admin / normal register)
   app.post("/api/users/register", (req, res) => {
-    const { username, email, password } = req.body;
+    const { username, email, password } =
+      req.body;
+
     if (!username || !email) {
-      return res.status(400).json({ error: "Username and email are required" });
+      return res.status(400).json({
+        error:
+          "Username and email are required",
+      });
     }
 
-    const exists = db.users.find((u: any) => u.username.toLowerCase() === username.toLowerCase() || u.email.toLowerCase() === email.toLowerCase());
+    const exists = db.users.find(
+      (u: any) =>
+        u.username.toLowerCase() ===
+          username.toLowerCase() ||
+        u.email.toLowerCase() ===
+          email.toLowerCase()
+    );
+
     if (exists) {
-      return res.status(400).json({ error: "ชื่อผู้ใช้หรืออีเมลนี้มีอยู่ในระบบแล้ว" });
+      return res.status(400).json({
+        error:
+          "ชื่อผู้ใช้หรืออีเมลนี้มีอยู่ในระบบแล้ว",
+      });
     }
 
     const newUser: User = {
       id: "usr-" + Date.now(),
       username,
       email,
-      balance: 0.00,
+      balance: 0,
       role: "user",
-      password: password || "123456"
+      password: password || "123456",
     };
 
     db.users.push(newUser);
     saveDB(db);
-    res.status(201).json(newUser);
+
+    res.status(201).json({
+      ...toPublicUser(newUser),
+      authToken:
+        createSessionToken(newUser.id),
+    });
   });
 
   // Login User
   app.post("/api/users/login", (req, res) => {
-    const { username, password } = req.body;
-    const user = db.users.find((u: any) => u.username.toLowerCase() === username.toLowerCase());
+    const { username, password } =
+      req.body;
+
+    const user = db.users.find(
+      (u: any) =>
+        u.username.toLowerCase() ===
+        username.toLowerCase()
+    );
+
     if (!user) {
-      return res.status(401).json({ error: "ไม่พบผู้ใช้นี้ หรือรหัสผ่านไม่ถูกต้อง" });
+      return res.status(401).json({
+        error:
+          "ไม่พบผู้ใช้นี้ หรือรหัสผ่านไม่ถูกต้อง",
+      });
     }
-    // If the user object contains a password, verify it
+
     if (user.password && password) {
       if (user.role === "admin") {
-        if (password !== user.password && password !== "admin" && password !== "123456") {
-          return res.status(401).json({ error: "รหัสผ่านสำหรับแอดมินไม่ถูกต้อง กรุณาระบุรหัสผ่านที่ถูกต้อง (สามารถใช้รหัสผ่านเริ่มต้น admin หรือ 123456 ได้ค่ะ)" });
+        if (
+          password !== user.password &&
+          password !== "admin" &&
+          password !== "123456"
+        ) {
+          return res.status(401).json({
+            error:
+              "รหัสผ่านสำหรับแอดมินไม่ถูกต้อง กรุณาระบุรหัสผ่านที่ถูกต้อง",
+          });
         }
-      } else if (user.password !== password) {
-        return res.status(401).json({ error: "รหัสผ่านไม่ถูกต้อง กรุณาระบุรหัสผ่านที่ถูกต้องค่ะ" });
+      } else if (
+        user.password !== password
+      ) {
+        return res.status(401).json({
+          error:
+            "รหัสผ่านไม่ถูกต้อง กรุณาระบุรหัสผ่านที่ถูกต้องค่ะ",
+        });
       }
     }
-    res.json(user);
+
+    res.json({
+      ...toPublicUser(user),
+      authToken:
+        createSessionToken(user.id),
+    });
   });
 
   // Discord Auth Simulation
-  app.post("/api/users/discord-login", (req, res) => {
-    const { discordUsername, discordId, avatarUrl } = req.body;
-    if (!discordUsername || !discordId) {
-      return res.status(400).json({ error: "Discord info missing" });
-    }
-
-    let user = db.users.find((u: any) => u.discordId === discordId);
-    if (!user) {
-      user = {
-        id: "usr-dc-" + discordId,
-        username: `${discordUsername}_dc`,
-        email: `${discordUsername}@discord.com`,
-        balance: 0.00,
-        role: "user",
+  app.post(
+    "/api/users/discord-login",
+    (req, res) => {
+      const {
+        discordUsername,
         discordId,
-        avatarUrl: avatarUrl || "https://images.unsplash.com/photo-1614680376593-902f74fa0d41?auto=format&fit=crop&w=40&q=80"
-      };
-      db.users.push(user);
-    } else {
-      user.avatarUrl = avatarUrl || user.avatarUrl;
+        avatarUrl,
+      } = req.body;
+
+      if (
+        !discordUsername ||
+        !discordId
+      ) {
+        return res.status(400).json({
+          error: "Discord info missing",
+        });
+      }
+
+      let user = db.users.find(
+        (u: any) =>
+          u.discordId === discordId
+      );
+
+      if (!user) {
+        user = {
+          id: "usr-dc-" + discordId,
+          username:
+            `${discordUsername}_dc`,
+          email:
+            `${discordUsername}@discord.com`,
+          balance: 0,
+          role: "user",
+          discordId,
+          avatarUrl:
+            avatarUrl ||
+            "https://images.unsplash.com/photo-1614680376593-902f74fa0d41?auto=format&fit=crop&w=40&q=80",
+        };
+
+        db.users.push(user);
+      } else {
+        user.avatarUrl =
+          avatarUrl || user.avatarUrl;
+      }
+
+      saveDB(db);
+
+      res.json({
+        ...toPublicUser(user),
+        authToken:
+          createSessionToken(user.id),
+      });
     }
-    saveDB(db);
-    res.json(user);
-  });
+  );
 
   // Get Current User
   app.get("/api/users/me/:id", (req, res) => {
-    const user = db.users.find((u: any) => u.id === req.params.id);
-    if (!user) return res.status(404).json({ error: "User not found" });
-    res.json(user);
+    const user = db.users.find(
+      (u: any) =>
+        u.id === req.params.id
+    );
+
+    if (!user) {
+      return res.status(404).json({
+        error: "User not found",
+      });
+    }
+
+    const token = getBearerToken(
+      req.headers.authorization
+    );
+
+    const session =
+      readSessionToken(token);
+
+    res.json({
+      ...toPublicUser(user),
+      ...(session?.userId === user.id &&
+      token
+        ? { authToken: token }
+        : {}),
+    });
   });
 
   // Update Current User Profile (For all roles)
@@ -943,29 +1291,82 @@ async function startServer() {
       id: "tx-" + Date.now(),
       userId: user.id,
       username: user.username,
+
+      // ระบุสินค้าที่ซื้ออย่างชัดเจน
       productId: product.id,
-      type: product.type === "box" ? "purchase_box" : "purchase_product",
+
+      orderItems: [
+        {
+          productId: product.id,
+          productName: product.name,
+          quantity: 1,
+          price: product.price,
+        },
+      ],
+
+      type:
+        product.type === "box"
+          ? "purchase_box"
+          : "purchase_product",
+
       amount: totalToPay,
-      details: `${product.type === "box" ? "สุ่มกล่อง" : "ซื้อสินค้าจัดส่ง"} [${product.name}] - ${rewardDetails} ${couponDetails}${shippingDetailsText}`,
+
+      details: `${
+        product.type === "box"
+          ? "สุ่มกล่อง"
+          : "ซื้อสินค้าจัดส่ง"
+      } [${product.name}] - ${rewardDetails} ${couponDetails}${shippingDetailsText}`,
+
       status: "success",
       date: new Date().toISOString(),
       sellerId,
       isSellerCredited: false,
-      ...(hasShipping ? {
-        shippingDetails: req.body.shippingDetails,
-        orderStatus: "preparing",
-        trackingNumber: "",
-        trackingCarrier: "",
-        statusUpdates: [
-          {
-            status: "preparing",
-            date: new Date().toISOString(),
-            note: "ร้านค้าได้รับคำสั่งซื้อและกำลังเริ่มจัดเตรียมพัสดุของคุณ"
+
+      ...(hasShipping
+        ? {
+            shippingDetails:
+              req.body.shippingDetails,
+
+            orderStatus: "preparing",
+            trackingNumber: "",
+            trackingCarrier: "",
+
+            statusUpdates: [
+              {
+                status: "preparing",
+                date: new Date().toISOString(),
+                note:
+                  "ร้านค้าได้รับคำสั่งซื้อและกำลังเริ่มจัดเตรียมพัสดุของคุณ",
+
+                productIds: [product.id],
+              },
+            ],
           }
-        ]
-      } : {})
+        : {
+            statusUpdates: [
+              {
+                status: "delivered",
+                date: new Date().toISOString(),
+                note:
+                  "ระบบส่งมอบสินค้าดิจิทัลสำเร็จแล้ว",
+
+                productIds: [product.id],
+              },
+            ],
+          }),
     };
     db.transactions.unshift(newTx);
+
+    addUserNotification(
+      user.id,
+      hasShipping
+        ? "สั่งซื้อสำเร็จ"
+        : "ได้รับสินค้าดิจิทัลแล้ว",
+      hasShipping
+        ? `คำสั่งซื้อ ${product.name} ได้รับการยืนยันแล้ว ร้านค้ากำลังเตรียมสินค้าให้คุณ`
+        : `ระบบส่งมอบ ${product.name} สำเร็จแล้ว คุณสามารถเขียนรีวิวจากผู้ซื้อจริงได้ทันที`
+    );
+
     saveDB(db);
     try {
       broadcastPurchase(newTx);
@@ -1087,28 +1488,78 @@ async function startServer() {
       id: "tx-" + Date.now(),
       userId: user.id,
       username: user.username,
+
+      // เก็บข้อมูลสินค้าทุกชิ้นในตะกร้า
+      orderItems: validatedItems.map(
+        ({ product, quantity }) => ({
+          productId: product.id,
+          productName: product.name,
+          quantity,
+          price: product.price,
+        })
+      ),
+
       type: "purchase_product",
       amount: totalToPay,
-      details: `ซื้อสินค้าจากตะกร้า: ${purchasedSummary.join(", ")} - รายละเอียดสินค้า: ${rewardsList.join(" | ")} ${couponDetails}${shippingDetailsText}`,
+
+      details: `ซื้อสินค้าจากตะกร้า: ${purchasedSummary.join(
+        ", "
+      )} - รายละเอียดสินค้า: ${rewardsList.join(
+        " | "
+      )} ${couponDetails}${shippingDetailsText}`,
+
       status: "success",
       date: new Date().toISOString(),
       isSellerCredited: false,
-      ...(hasShipping ? {
-        shippingDetails: shippingDetails,
-        orderStatus: "preparing",
-        trackingNumber: "",
-        trackingCarrier: "",
-        statusUpdates: [
-          {
-            status: "preparing",
-            date: new Date().toISOString(),
-            note: "ร้านค้าได้รับคำสั่งซื้อจากตะกร้าสินค้าเรียบร้อยแล้ว และกำลังเตรียมจัดส่งพัสดุของคุณ"
+
+      ...(hasShipping
+        ? {
+            shippingDetails,
+            orderStatus: "preparing",
+            trackingNumber: "",
+            trackingCarrier: "",
+
+            statusUpdates: [
+              {
+                status: "preparing",
+                date: new Date().toISOString(),
+                note:
+                  "ร้านค้าได้รับคำสั่งซื้อจากตะกร้าสินค้าเรียบร้อยแล้ว และกำลังเตรียมจัดส่งพัสดุของคุณ",
+
+                productIds: validatedItems.map(
+                  ({ product }) => product.id
+                ),
+              },
+            ],
           }
-        ]
-      } : {})
+        : {
+            statusUpdates: [
+              {
+                status: "delivered",
+                date: new Date().toISOString(),
+                note:
+                  "ระบบส่งมอบสินค้าดิจิทัลในตะกร้าสำเร็จแล้ว",
+
+                productIds: validatedItems.map(
+                  ({ product }) => product.id
+                ),
+              },
+            ],
+          }),
     };
 
     db.transactions.unshift(newTx);
+
+    addUserNotification(
+      user.id,
+      hasShipping
+        ? "สั่งซื้อสินค้าจากตะกร้าสำเร็จ"
+        : "ได้รับสินค้าดิจิทัลแล้ว",
+      hasShipping
+        ? `คำสั่งซื้อ ${purchasedSummary.join(", ")} ได้รับการยืนยันแล้ว ร้านค้ากำลังเตรียมจัดส่ง`
+        : `ระบบส่งมอบ ${purchasedSummary.join(", ")} สำเร็จแล้ว คุณสามารถเขียนรีวิวได้ทันที`
+    );
+
     saveDB(db);
 
     try {
@@ -1685,43 +2136,297 @@ Verify carefully and prevent mock/fake slips. Return JSON strictly matching the 
         orderStatus === 'delivered' ? 'จัดส่งสำเร็จ' : 'ยกเลิกคำสั่งซื้อ'
       }`
     });
+        let notificationTitle =
+      "อัปเดตสถานะคำสั่งซื้อ";
 
+    let notificationBody =
+      note ||
+      "สถานะคำสั่งซื้อของคุณได้รับการอัปเดต";
+
+    if (orderStatus === "preparing") {
+      notificationTitle =
+        "ร้านค้ากำลังเตรียมสินค้า";
+
+      notificationBody =
+        note ||
+        "ร้านค้าได้รับคำสั่งซื้อและกำลังจัดเตรียมพัสดุของคุณ";
+    }
+
+    if (orderStatus === "shipped") {
+      notificationTitle =
+        "พัสดุของคุณถูกจัดส่งแล้ว";
+
+      notificationBody =
+        `${
+          trackingCarrier ||
+          "บริษัทขนส่ง"
+        } เลขพัสดุ ${
+          trackingNumber || "-"
+        }`;
+    }
+
+    if (orderStatus === "delivered") {
+      notificationTitle =
+        "จัดส่งสินค้าเรียบร้อยแล้ว";
+
+      notificationBody =
+        "คำสั่งซื้อเสร็จสมบูรณ์ ตอนนี้คุณสามารถเขียนรีวิวจากผู้ซื้อจริงได้แล้ว";
+    }
+
+    if (orderStatus === "cancelled") {
+      notificationTitle =
+        "คำสั่งซื้อถูกยกเลิก";
+
+      notificationBody =
+        note ||
+        "คำสั่งซื้อของคุณถูกยกเลิก กรุณาติดต่อร้านค้าหรือแอดมินหากมีข้อสงสัย";
+    }
+
+    addUserNotification(
+      tx.userId,
+      notificationTitle,
+      notificationBody
+    );
     saveDB(db);
     res.json({ success: true, transaction: tx });
   });
 
-  // Add Product Review API
+  // ตรวจสิทธิ์ในการรีวิวสินค้า
+  const getReviewEligibility = (
+    userId: string,
+    productId: string
+  ) => {
+    const existingReview = db.reviews
+      .filter(
+        (review: any) =>
+          review.userId === userId &&
+          review.productId === productId
+      )
+      .map(toVerifiedPublicReview)
+      .find(Boolean);
+
+    if (existingReview) {
+      return {
+        eligible: false,
+        reasonCode: "already_reviewed",
+        message:
+          "คุณได้รีวิวสินค้าชิ้นนี้แล้ว (รีวิวได้ 1 ครั้งต่อสินค้า)",
+        existingReview,
+      };
+    }
+
+    const matchingPurchases = getMatchingPurchases(
+      userId,
+      productId
+    );
+
+    if (matchingPurchases.length === 0) {
+      return {
+        eligible: false,
+        reasonCode: "not_purchased",
+        message:
+          "เฉพาะผู้ที่ซื้อสินค้าชิ้นนี้จริงเท่านั้นจึงจะเขียนรีวิวได้",
+      };
+    }
+
+    const verifiedPurchase = findVerifiedPurchase(
+      userId,
+      productId
+    );
+
+    if (!verifiedPurchase) {
+      const hasActiveOrder = matchingPurchases.some(
+        (tx: any) =>
+          tx.status === "success" &&
+          tx.orderStatus !== "cancelled"
+      );
+
+      return {
+        eligible: false,
+        reasonCode: hasActiveOrder
+          ? "awaiting_delivery"
+          : "order_not_completed",
+        message: hasActiveOrder
+          ? "รีวิวได้หลังจากคำสั่งซื้อจัดส่งสำเร็จและยืนยันว่าได้รับสินค้าแล้ว"
+          : "คำสั่งซื้อนี้ยังไม่สำเร็จหรือถูกยกเลิก จึงยังไม่สามารถรีวิวได้",
+      };
+    }
+
+    return {
+      eligible: true,
+      reasonCode: "verified_purchase",
+      message:
+        "ยืนยันสิทธิ์ผู้ซื้อจริงแล้ว คุณสามารถรีวิวสินค้าชิ้นนี้ได้",
+      purchaseDate: verifiedPurchase.tx.date,
+    };
+  };
+
+  // ตรวจสอบว่าผู้ใช้มีสิทธิ์รีวิวหรือไม่
+  app.get("/api/reviews/eligibility", (req, res) => {
+    const user = getAuthenticatedUser(req);
+
+    if (!user) {
+      return res.status(401).json({
+        eligible: false,
+        reasonCode: "session_required",
+        error:
+          "กรุณาออกจากระบบแล้วเข้าสู่ระบบใหม่เพื่อยืนยันตัวตนก่อนรีวิว",
+      });
+    }
+
+    const productId = String(
+      req.query.productId || ""
+    );
+
+    const product = db.products.find(
+      (candidate: any) =>
+        candidate.id === productId
+    );
+
+    if (!product) {
+      return res.status(404).json({
+        error: "ไม่พบข้อมูลสินค้า",
+      });
+    }
+
+    res.json(
+      getReviewEligibility(user.id, productId)
+    );
+  });
+
+  // เพิ่มรีวิวสินค้า
   app.post("/api/reviews", (req, res) => {
-    const userId = req.headers["x-user-id"] as string;
-    const { productId, rating, comment } = req.body;
+    const user = getAuthenticatedUser(req);
 
-    const user = db.users.find((u: any) => u.id === userId);
-    if (!user) return res.status(403).json({ error: "กรุณาล็อกอินก่อนเขียนรีวิว" });
+    if (!user) {
+      return res.status(401).json({
+        error:
+          "เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่ก่อนเขียนรีวิว",
+      });
+    }
 
-    const product = db.products.find((p: any) => p.id === productId);
-    if (!product) return res.status(404).json({ error: "ไม่พบข้อมูลสินค้า" });
+    const productId = String(
+      req.body.productId || ""
+    );
+
+    const rating = Number(req.body.rating);
+
+    const comment = String(
+      req.body.comment || ""
+    ).trim();
+
+    const product = db.products.find(
+      (candidate: any) =>
+        candidate.id === productId
+    );
+
+    if (!product) {
+      return res.status(404).json({
+        error: "ไม่พบข้อมูลสินค้า",
+      });
+    }
+
+    if (
+      !Number.isInteger(rating) ||
+      rating < 1 ||
+      rating > 5
+    ) {
+      return res.status(400).json({
+        error: "กรุณาให้คะแนนตั้งแต่ 1 ถึง 5 ดาว",
+      });
+    }
+
+    if (
+      comment.length < 5 ||
+      comment.length > 600
+    ) {
+      return res.status(400).json({
+        error:
+          "ข้อความรีวิวต้องมีความยาว 5–600 ตัวอักษร",
+      });
+    }
+
+    const eligibility = getReviewEligibility(
+      user.id,
+      productId
+    );
+
+    if (!eligibility.eligible) {
+      const statusCode =
+        eligibility.reasonCode === "already_reviewed"
+          ? 409
+          : 403;
+
+      return res.status(statusCode).json({
+        error: eligibility.message,
+        reasonCode: eligibility.reasonCode,
+      });
+    }
+
+    // ลบเฉพาะรีวิวเก่าที่ไม่มีหลักฐานการซื้อ
+    db.reviews = db.reviews.filter(
+      (review: any) => {
+        if (
+          review.userId !== user.id ||
+          review.productId !== productId
+        ) {
+          return true;
+        }
+
+        return Boolean(
+          toVerifiedPublicReview(review)
+        );
+      }
+    );
 
     const newReview: Review = {
-      id: "rev-" + Date.now(),
+      id: `rev-${randomUUID()}`,
       userId: user.id,
       username: user.username,
-      rating: Number(rating),
+      rating,
       productId,
       productName: product.name,
-      comment: comment || "",
-      date: new Date().toISOString()
+      comment,
+      date: new Date().toISOString(),
     };
-
     db.reviews.unshift(newReview);
+
+    addUserNotification(
+      user.id,
+      "เผยแพร่รีวิวเรียบร้อยแล้ว",
+      `ขอบคุณสำหรับรีวิว ${rating} ดาวของสินค้า ${product.name}`
+    );
+
     saveDB(db);
-    res.status(201).json(newReview);
+
+    res.status(201).json(
+      toVerifiedPublicReview(newReview)
+    );
   });
 
-  // Get Product Reviews
+  // แสดงเฉพาะรีวิวจากผู้ซื้อจริง
   app.get("/api/reviews", (req, res) => {
-    res.json(db.reviews);
-  });
+    const productId =
+      typeof req.query.productId === "string"
+        ? req.query.productId
+        : "";
 
+    const verifiedReviews = db.reviews
+      .map(toVerifiedPublicReview)
+      .filter(Boolean)
+      .filter(
+        (review: any) =>
+          !productId ||
+          review.productId === productId
+      )
+      .sort(
+        (a: any, b: any) =>
+          Date.parse(b.date) -
+          Date.parse(a.date)
+      );
+
+    res.json(verifiedReviews);
+  });
   // Get Admin/Dashboard general stats
   app.get("/api/admin/stats", (req, res) => {
     const adminCheck = req.headers["x-user-role"];
@@ -2040,9 +2745,23 @@ Verify carefully and prevent mock/fake slips. Return JSON strictly matching the 
       date: new Date().toISOString(),
       note: note || `จัดส่งสินค้าแล้ว โดย ${tx.trackingCarrier} เลขแทร็กกิ้ง: ${tx.trackingNumber}`
     });
+    addUserNotification(
+      tx.userId,
+      "พัสดุของคุณถูกจัดส่งแล้ว",
+      `${
+        tx.trackingCarrier ||
+        "บริษัทขนส่ง"
+      } เลขพัสดุ ${
+        tx.trackingNumber || "-"
+      }`
+    );
 
     saveDB(db);
-    res.json({ success: true, transaction: tx });
+
+    res.json({
+      success: true,
+      transaction: tx,
+    });
   });
 
   // POST buyer confirm delivery (escrow unlock!)
@@ -2082,7 +2801,11 @@ Verify carefully and prevent mock/fake slips. Return JSON strictly matching the 
         tx.isSellerCredited = true;
       }
     }
-
+    addUserNotification(
+      tx.userId,
+      "ยืนยันรับสินค้าเรียบร้อยแล้ว",
+      "ขอบคุณที่ยืนยันรับสินค้า ตอนนี้คุณสามารถเขียนรีวิวจากผู้ซื้อจริงให้สินค้าชิ้นนี้ได้แล้ว"
+    );
     saveDB(db);
     res.json({ success: true, transaction: tx });
   });
@@ -3061,6 +3784,105 @@ app.post("/api/chat/admin-support", (req, res) => {
     broadcastChatEvent({ type: "conversation_status_updated", conversationId: conv.id, status });
     res.json({ success: true, conversation: conv });
   });
+  // ดูการแจ้งเตือนของบัญชีที่เข้าสู่ระบบ
+  app.get("/api/notifications", (req, res) => {
+    const user = getAuthenticatedUser(req);
+
+    if (!user) {
+      return res.status(401).json({
+        error:
+          "กรุณาเข้าสู่ระบบใหม่เพื่อดูการแจ้งเตือน",
+      });
+    }
+
+    const notifications = (
+      db.notifications || []
+    )
+      .filter(
+        (notification: any) =>
+          notification.userId === user.id
+      )
+      .sort(
+        (a: any, b: any) =>
+          Date.parse(b.createdAt) -
+          Date.parse(a.createdAt)
+      )
+      .slice(0, 50);
+
+    res.json(notifications);
+  });
+
+  // ทำเครื่องหมายว่าอ่านทั้งหมดแล้ว
+  app.post(
+    "/api/notifications/read-all",
+    (req, res) => {
+      const user =
+        getAuthenticatedUser(req);
+
+      if (!user) {
+        return res.status(401).json({
+          error:
+            "กรุณาเข้าสู่ระบบใหม่",
+        });
+      }
+
+      (db.notifications || []).forEach(
+        (notification: any) => {
+          if (
+            notification.userId ===
+            user.id
+          ) {
+            notification.isRead = true;
+          }
+        }
+      );
+
+      saveDB(db);
+
+      res.json({
+        success: true,
+      });
+    }
+  );
+
+  // ทำเครื่องหมายว่าอ่านรายการนี้แล้ว
+  app.post(
+    "/api/notifications/:id/read",
+    (req, res) => {
+      const user =
+        getAuthenticatedUser(req);
+
+      if (!user) {
+        return res.status(401).json({
+          error:
+            "กรุณาเข้าสู่ระบบใหม่",
+        });
+      }
+
+      const notification = (
+        db.notifications || []
+      ).find(
+        (candidate: any) =>
+          candidate.id ===
+            req.params.id &&
+          candidate.userId === user.id
+      );
+
+      if (!notification) {
+        return res.status(404).json({
+          error:
+            "ไม่พบการแจ้งเตือน",
+        });
+      }
+
+      notification.isRead = true;
+      saveDB(db);
+
+      res.json({
+        success: true,
+      });
+    }
+  );
 
   // GET User notifications
   app.get("/api/chat/notifications", (req, res) => {

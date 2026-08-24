@@ -4,6 +4,7 @@ import { User, AppSettings } from "../types";
 import { motion, AnimatePresence } from "motion/react";
 import { Language, getTranslation } from "../lib/translations";
 import AccessibilityControls from "./AccessibilityControls";
+import NotificationCenter from "./NotificationCenter";
 
 interface HeaderProps {
   user: User | null;
@@ -160,7 +161,15 @@ export default function Header({
               </span>
             )}
           </button>
-
+                    {/* กระดิ่งแจ้งเตือนสำหรับผู้ใช้ */}
+          {user && (
+            <NotificationCenter
+              user={user}
+              lang={lang}
+              onOpenHistory={onOpenHistory}
+              onOpenChat={onOpenChat}
+            />
+          )}
           {user ? (
             /* Logged in layout */
             <div className="flex items-center gap-1.5 sm:gap-3">
