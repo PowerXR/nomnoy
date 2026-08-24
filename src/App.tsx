@@ -21,7 +21,6 @@ import ReviewShowcase from "./components/ReviewShowcase";
 import RecentOrdersMarquee from "./components/RecentOrdersMarquee";
 import SeasonalEffects from "./components/SeasonalEffects";
 import TextReader from "./components/TextReader";
-import CommunityChat from "./components/CommunityChat";
 
 
 // Icons
