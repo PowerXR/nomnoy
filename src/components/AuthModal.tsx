@@ -145,7 +145,7 @@ export default function AuthModal({
           damping: 24
         }}
         onMouseDown={(event) => event.stopPropagation()}
-        className="relative grid w-full max-w-6xl overflow-hidden rounded-[30px] border border-[#B68A5B]/30 bg-[#F8F5F0] shadow-[0_35px_100px_rgba(0,0,0,0.55)] lg:min-h-[680px] lg:grid-cols-[1.08fr_0.92fr]"
+        className="relative grid w-full max-w-6xl overflow-hidden lg:[zoom:0.86] xl:[zoom:0.9] rounded-[30px] border border-[#B68A5B]/30 bg-[#F8F5F0] shadow-[0_35px_100px_rgba(0,0,0,0.55)] lg:min-h-[680px] lg:grid-cols-[1.08fr_0.92fr]"
       >
         {/* ปุ่มปิด */}
         <button
