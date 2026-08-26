@@ -387,22 +387,6 @@ export default function NamNoiMap({ settings, lang = "th" }: { settings?: AppSet
               ) : (
                 // Live Iframe Embed Mode (Works perfectly out-of-the-box, no keys needed)
                 <div className="relative w-full h-full flex flex-col">
-                  {/* Floating Notification Badge */}
-                  <div className="absolute top-3 left-3 right-3 z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-2.5 px-3.5 rounded-2xl bg-white/95 dark:bg-[#151210]/95 backdrop-blur-md border border-[#8E6D4E]/25 shadow-lg shadow-[#8E6D4E]/5 text-left transition-all duration-300">
-                    <div className="flex items-center gap-2 min-w-0">
-                      <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
-                      <p className="text-[10.5px] text-stone-600 dark:text-stone-300 font-medium truncate">
-                        📍 พิกัดแนะนำ: <span className="font-bold text-[#8E6D4E]">{selectedLandmark?.name}</span>
-                      </p>
-                    </div>
-                    <button
-                      onClick={() => setShowSetupGuide(true)}
-                      className="text-[9px] sm:text-[9.5px] font-extrabold bg-[#FAF7F2] dark:bg-[#1C1815] hover:bg-[#8E6D4E] hover:text-white border border-[#8E6D4E]/30 text-[#8E6D4E] px-2.5 py-1 rounded-xl transition-all flex items-center justify-center gap-1 cursor-pointer shrink-0"
-                    >
-                      <span>⚙️ วิธีตั้งค่ากุญแจแผนที่อัจฉริยะ (API)</span>
-                    </button>
-                  </div>
-
                   {/* Free Interactive Google Maps Embed Frame */}
                   <div className="w-full h-full pt-16 sm:pt-0">
                     <iframe
