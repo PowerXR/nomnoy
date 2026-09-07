@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "motion/react";
 import { Language, getTranslation } from "../lib/translations";
 import AccessibilityControls from "./AccessibilityControls";
 import NotificationCenter from "./NotificationCenter";
+import { ..., Store, ... } from "lucide-react";
 
 interface HeaderProps {
   user: User | null;
@@ -67,7 +68,7 @@ export default function Header({
               </div>
             ) : (
               <div className="p-1.5 rounded-xl border border-[#8E6D4E]/20 bg-[#FAF7F2] dark:bg-[#1E1916] text-[#8E6D4E]">
-                <Palette className="h-4 w-4 sm:h-5 sm:w-5" />
+                <Store className="h-4 w-4 sm:h-5 sm:w-5" />
               </div>
             )}
             <span className="text-base sm:text-xl font-bold font-serif tracking-tight text-[#4E3B2C] dark:text-[#EAE3DA]">
