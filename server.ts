@@ -1653,7 +1653,7 @@ async function startServer() {
         const thunderResponse = await fetch("https://api.thunder.in.th/v2/verify/bank", {
           method: "POST",
           headers: {
-            "Authorization": "Bearer 375e17b2-ca57-4f02-9f59-4f2978e428e1"
+            "Authorization": "Bearer 113e7de6-3bea-4799-83cd-ae0ebc02011f"
           },
           body: thunderFormData
         });
