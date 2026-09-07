@@ -2626,13 +2626,13 @@ Verify carefully and prevent mock/fake slips. Return JSON strictly matching the 
     res.json(sellerProds);
   });
 
-  // POST add or edit seller product
+  // POST add or edit seller product ( POST เพิ่มหรือแก้ไขสินค้าของผู้ขาย ) 
   app.post("/api/seller/products", (req, res) => {
     const userId = req.headers["x-user-id"] as string;
     const user = db.users.find((u: any) => u.id === userId);
     if (!user) return res.status(403).json({ error: "Unauthorized" });
 
-    // Only allow verified sellers or admin
+    // Only allow verified sellers or admin ( อนุญาตเฉพาะผู้ขายที่ผ่านการยืนยันตัวตนหรือผู้ดูแลระบบเท่านั้น )
     const isSeller = user.role === "seller_internal" || user.role === "seller_external" || user.role === "admin";
     if (!isSeller) {
       return res.status(403).json({ error: "เฉพาะผู้ขายที่ได้รับการอนุมัติเท่านั้นที่สามารถลงขายสินค้าได้" });
@@ -2644,7 +2644,7 @@ Verify carefully and prevent mock/fake slips. Return JSON strictly matching the 
       return res.status(400).json({ error: "กรุณากรอกข้อมูลผลิตภัณฑ์หลักให้ครบถ้วน" });
     }
 
-    // Process stock
+    // Process stock ( ดำเนินการจัดการสินค้าคงคลัง )
     let stockArr: string[] = [];
     if (typeof stock === "string") {
       stockArr = stock.split("\n").map(s => s.trim()).filter(Boolean);
@@ -2653,12 +2653,12 @@ Verify carefully and prevent mock/fake slips. Return JSON strictly matching the 
     }
 
     if (id) {
-      // Edit mode
+      // Edit mode ( โหมดแก้ไข )
       const prodIndex = db.products.findIndex((p: any) => p.id === id);
       if (prodIndex === -1) return res.status(404).json({ error: "ไม่พบสินค้าที่ต้องการแก้ไข" });
 
       const prod = db.products[prodIndex];
-      // Check owner
+      // Check owner ( ตรวจสอบเจ้าของ )
       if (prod.sellerId !== userId && user.role !== "admin") {
         return res.status(403).json({ error: "คุณไม่มีสิทธิ์แก้ไขสินค้าชิ้นนี้" });
       }
@@ -2695,7 +2695,7 @@ Verify carefully and prevent mock/fake slips. Return JSON strictly matching the 
     res.json({ success: true, message: "บันทึกผลิตภัณฑ์ลงระบบเสร็จสิ้น" });
   });
 
-  // DELETE seller product
+  // DELETE seller product ( ลบสินค้าของผู้ขาย )
   app.delete("/api/seller/products/:id", (req, res) => {
     const userId = req.headers["x-user-id"] as string;
     const user = db.users.find((u: any) => u.id === userId);
