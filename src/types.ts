@@ -261,4 +261,14 @@ export interface Notification {
   isRead: boolean;
   createdAt: string;
 }
+export interface CommunityVideo {
+  id: string;
+  title: string;
+  youtubeUrl: string;
+  description: string;
+  productName?: string;
+  thumbnailUrl?: string;
+  isActive: boolean;
+  createdAt: string;
+}
 
