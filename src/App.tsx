@@ -21,8 +21,6 @@ import ReviewShowcase from "./components/ReviewShowcase";
 import RecentOrdersMarquee from "./components/RecentOrdersMarquee";
 import SeasonalEffects from "./components/SeasonalEffects";
 import TextReader from "./components/TextReader";
-import CommunityVideos from "./components/CommunityVideos";
-import CommunityVideosAdmin from "./components/CommunityVideosAdmin";
 
 
 // Icons
@@ -54,8 +52,6 @@ export default function App() {
   const [authModalType, setAuthModalType] = useState<"login" | "register">("login");
   const [topupModalOpen, setTopupModalOpen] = useState(false);
   const [adminPanelOpen, setAdminPanelOpen] = useState(false);
-  const [communityVideosOpen, setCommunityVideosOpen] = useState(false);
-  const [communityVideosAdminOpen, setCommunityVideosAdminOpen] = useState(false);
   const [historyModalOpen, setHistoryModalOpen] = useState(false);
   const [sellerModalOpen, setSellerModalOpen] = useState(false);
   const [profileModalOpen, setProfileModalOpen] = useState(false);
