@@ -3,11 +3,25 @@ import path from "path";
 import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
-import { AppSettings, Category, Product, User, Coupon, Transaction, Review, BoxItem, Conversation, Message, Notification } from "./src/types";
+import {
+  AppSettings,
+  Category,
+  Product,
+  User,
+  Coupon,
+  Transaction,
+  Review,
+  BoxItem,
+  Conversation,
+  Message,
+  Notification,
+  CommunityVideo
+} from "./src/types";
 import { loadFromPrisma, saveToPrisma } from "./src/lib/prisma-sync";
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
 import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+
 
 
 const supabaseStorage = createClient(
