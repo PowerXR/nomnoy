@@ -5,7 +5,6 @@ import { motion, AnimatePresence } from "motion/react";
 import { Language, getTranslation } from "../lib/translations";
 import AccessibilityControls from "./AccessibilityControls";
 import NotificationCenter from "./NotificationCenter";
-import { ..., Store, ... } from "lucide-react";
 
 interface HeaderProps {
   user: User | null;
