@@ -480,8 +480,7 @@ export const productTranslations = {
     en: {
       name: "Herbal Medicine",
       description: "Folk wisdom for your good health.",
-      details: "Local wisdom for your well-being.Benefits include participation in the annual Kathin ceremony and support for small-scale sustainable livelihoods.Eco-friendly packaging using natural materials to reduce plastic waste.
-Easily update shipping details or check order status via your history page."
+      details: "Local wisdom for your well-being.Benefits include participation in the annual Kathin ceremony and support for small-scale sustainable livelihoods.Eco-friendly packaging using natural materials to reduce plastic waste.Easily update shipping details or check order status via your history page."
     },
     zh: {
       name: "草药疗法",
