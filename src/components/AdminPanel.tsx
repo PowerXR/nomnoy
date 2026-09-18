@@ -7,6 +7,7 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 
+// กำหนดชนิดข้อมูล (Props) ที่คอมโพเนนต์อัปโหลดรูปภาพต้องได้รับ
 interface ImageUploaderProps {
   label?: string;
   value: string;
@@ -15,19 +16,23 @@ interface ImageUploaderProps {
 }
 
 function ImageUploader({ label, value, onChange, placeholder }: ImageUploaderProps) {
+  // เก็บสถานะระหว่างอัปโหลด และข้อความผิดพลาดที่ต้องแสดงแก่ผู้ใช้
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // อ่านไฟล์แรกที่ผู้ใช้เลือก หากไม่ได้เลือกไฟล์ให้หยุดทำงานทันที
     const file = e.target.files?.[0];
     if (!file) return;
 
     if (!file.type.startsWith("image/")) {
+      // ป้องกันการอัปโหลดไฟล์ที่ไม่ใช่รูปภาพ
       setError("กรุณาเลือกไฟล์รูปภาพเท่านั้น");
       return;
     }
 
     if (file.size > 10 * 1024 * 1024) {
+      // จำกัดขนาดไฟล์รูปภาพไม่ให้เกิน 10 MB
       setError("ขนาดไฟล์ต้องไม่เกิน 10MB");
       return;
     }
@@ -36,11 +41,13 @@ function ImageUploader({ label, value, onChange, placeholder }: ImageUploaderPro
     setUploading(true);
 
     try {
+      // แปลงไฟล์รูปภาพเป็น Base64 ก่อนส่งไปยัง API อัปโหลดของเซิร์ฟเวอร์
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64Data = reader.result as string;
         try {
           const res = await fetch("/api/upload", {
+            // ส่งชื่อไฟล์และข้อมูล Base64 ไปบันทึกบนเซิร์ฟเวอร์
             method: "POST",
             headers: {
               "Content-Type": "application/json",
@@ -56,6 +63,7 @@ function ImageUploader({ label, value, onChange, placeholder }: ImageUploaderPro
           }
 
           const data = await res.json();
+          // ส่ง URL รูปที่อัปโหลดสำเร็จกลับไปยังฟอร์มแม่
           onChange(data.url);
         } catch (err: any) {
           setError(err.message || "เกิดข้อผิดพลาดในการเชื่อมต่อเซิร์ฟเวอร์");
@@ -75,6 +83,7 @@ function ImageUploader({ label, value, onChange, placeholder }: ImageUploaderPro
   };
 
   return (
+    // ช่องนี้รองรับทั้งการวาง URL รูปภาพ และการเลือกไฟล์จากเครื่อง
     <div className="space-y-1.5 w-full">
       {label && <label className="block text-[10px] text-slate-400 font-medium">{label}</label>}
       <div className="flex flex-col sm:flex-row gap-2">
@@ -112,6 +121,7 @@ function ImageUploader({ label, value, onChange, placeholder }: ImageUploaderPro
 }
 
 interface AdminPanelProps {
+  // ข้อมูลและฟังก์ชันที่หน้าหลักส่งให้แผงควบคุมผู้ดูแลระบบ
   user: User | null;
   settings: AppSettings;
   categories: Category[];
@@ -132,16 +142,17 @@ export default function AdminPanel({
   onUpdateSettings,
   onRefreshData
 }: AdminPanelProps) {
+  // ระบุเมนูที่กำลังเปิดอยู่ โดยค่าเริ่มต้นคือหน้าแดชบอร์ด
   const [activeTab, setActiveTab] = useState<"dashboard" | "products" | "categories" | "coupons" | "users" | "settings" | "php-exporter" | "orders" | "about-us" | "portfolios" | "artisans" | "landmarks" | "seller-verifications" | "admin-withdrawals">("dashboard");
   const [stats, setStats] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
-  // Backup & Restore states
+  // สถานะของระบบสำรองและกู้คืนข้อมูล
   const [backupLoading, setBackupLoading] = useState(false);
   const [backupSuccessMsg, setBackupSuccessMsg] = useState("");
   const [backupErrorMsg, setBackupErrorMsg] = useState("");
 
-  // Custom confirmation dialog state
+  // ข้อมูลกล่องยืนยันแบบกำหนดเอง ใช้ก่อนดำเนินการที่สำคัญ เช่น การลบข้อมูล
   const [confirmDialog, setConfirmDialog] = useState<{
     isOpen: boolean;
     title: string;
@@ -156,7 +167,7 @@ export default function AdminPanel({
     onConfirm: () => {}
   });
 
-  // Custom alert / toast state
+  // ข้อมูลกล่องแจ้งผลแบบกำหนดเอง รองรับข้อความสำเร็จ ผิดพลาด และข้อมูลทั่วไป
   const [alertState, setAlertState] = useState<{
     isOpen: boolean;
     title: string;
@@ -170,10 +181,11 @@ export default function AdminPanel({
   });
 
   const showCustomAlert = (title: string, message: string, type: "success" | "error" | "info" = "info") => {
+    // เปิดกล่องแจ้งเตือนพร้อมกำหนดหัวข้อ รายละเอียด และประเภทของข้อความ
     setAlertState({ isOpen: true, title, message, type });
   };
 
-  // User management states
+  // สถานะสำหรับแสดง เพิ่ม และแก้ไขข้อมูลผู้ใช้งาน
   const [usersList, setUsersList] = useState<User[]>([]);
   const [userListLoading, setUserListLoading] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
@@ -186,13 +198,13 @@ export default function AdminPanel({
     balance: 0
   });
 
-  // Exporter code state
+  // สถานะของเครื่องมือแสดงและคัดลอกไฟล์โค้ด PHP ที่ระบบสร้างให้
   const [exporterFiles, setExporterFiles] = useState<any[]>([]);
   const [exporterInstructions, setExporterInstructions] = useState("");
   const [activeFileTab, setActiveFileTab] = useState(0);
   const [copiedFileIndex, setCopiedFileIndex] = useState<number | null>(null);
 
-  // Order & Shipping Tracking management states
+  // สถานะสำหรับรายการสั่งซื้อและแบบฟอร์มแก้ไขข้อมูลติดตามพัสดุ
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [txLoading, setTxLoading] = useState(false);
   const [updatingTxId, setUpdatingTxId] = useState<string | null>(null);
@@ -203,16 +215,17 @@ export default function AdminPanel({
     note: ""
   });
 
-  // Seller verifications & withdrawals admin state
+  // สถานะสำหรับตรวจสอบผู้ขายและอนุมัติคำขอถอนเงิน
   const [sellerVerifications, setSellerVerifications] = useState<any[]>([]);
   const [verificationsLoading, setVerificationsLoading] = useState(false);
   const [editingVrfId, setEditingVrfId] = useState<string | null>(null);
   const [adminWithdrawals, setAdminWithdrawals] = useState<any[]>([]);
   const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
-  const [withdrawalSlips, setWithdrawalSlips] = useState<Record<string, string>>({}); // withdrawal.id -> slipUrl
+  const [withdrawalSlips, setWithdrawalSlips] = useState<Record<string, string>>({}); // จับคู่รหัสคำขอถอนเงินกับ URL สลิปโอนเงิน
   const [uploadingSlipId, setUploadingSlipId] = useState<string | null>(null);
 
   const fetchVerifications = async () => {
+    // ดึงรายการคำขอยืนยันตัวตนผู้ขายจากระบบหลังบ้าน
     setVerificationsLoading(true);
     try {
       const res = await fetch("/api/admin/verifications", {
@@ -230,6 +243,7 @@ export default function AdminPanel({
   };
 
   const fetchAdminWithdrawals = async () => {
+    // ดึงรายการคำขอถอนรายได้ของผู้ขายทั้งหมด
     setWithdrawalsLoading(true);
     try {
       const res = await fetch("/api/admin/withdrawals", {
@@ -247,6 +261,7 @@ export default function AdminPanel({
   };
 
   const handleReviewVerification = async (id: string, status: "approved" | "rejected", adminNotes: string) => {
+    // ส่งผลการอนุมัติหรือปฏิเสธคำขอยืนยันตัวตนผู้ขายไปยัง API
     try {
       const res = await fetch(`/api/admin/verifications/${id}/review`, {
         method: "POST",
@@ -272,6 +287,7 @@ export default function AdminPanel({
   };
 
   const handleReviewWithdrawal = async (id: string, status: "approved" | "rejected", adminNotes: string, slipUrl?: string) => {
+    // ส่งผลตรวจสอบคำขอถอนเงิน พร้อมหมายเหตุและหลักฐานการโอน (ถ้ามี)
     try {
       const res = await fetch(`/api/admin/withdrawals/${id}/review`, {
         method: "POST",
@@ -295,11 +311,11 @@ export default function AdminPanel({
     }
   };
 
-  // App settings editing copy state
+  // สำเนาค่าตั้งค่าเว็บไซต์สำหรับแก้ไข โดยยังไม่กระทบค่าจริงจนกว่าจะบันทึก
   const [editedSettings, setEditedSettings] = useState<AppSettings>({ ...settings });
   const [newSlideUrl, setNewSlideUrl] = useState("");
 
-  // Add Product form state
+  // สถานะและข้อมูลแบบฟอร์มเพิ่มหรือแก้ไขสินค้า
   const [showProductForm, setShowProductForm] = useState(false);
   const [editingProductId, setEditingProductId] = useState<string | null>(null);
   const [productForm, setProductForm] = useState({
@@ -310,12 +326,12 @@ export default function AdminPanel({
     description: "",
     details: "",
     videoUrl: "",
-    stockText: "", // Raw string split by lines to populate stock array
+    stockText: "", // ข้อความดิบที่จะแยกทีละบรรทัดเพื่อสร้างรายการสต็อก
     type: "normal" as "normal" | "box",
-    boxItemsText: "" // JSON string format for simplicity
+    boxItemsText: "" // เก็บข้อมูลสินค้าในกล่องเป็นข้อความ JSON เพื่อให้จัดการได้ง่าย
   });
 
-  // Category form state
+  // สถานะและข้อมูลแบบฟอร์มหมวดหมู่สินค้า
   const [showCategoryForm, setShowCategoryForm] = useState(false);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [categoryForm, setCategoryForm] = useState({
@@ -325,7 +341,7 @@ export default function AdminPanel({
     imageUrl: ""
   });
 
-  // Coupons form state
+  // สถานะและข้อมูลแบบฟอร์มคูปองส่วนลด
   const [showCouponForm, setShowCouponForm] = useState(false);
   const [couponForm, setCouponForm] = useState({
     code: "",
@@ -334,7 +350,7 @@ export default function AdminPanel({
     usesLeft: 10
   });
 
-  // Portfolio management states
+  // สถานะสำหรับจัดการแฟ้มผลงานชุมชน
   const [showPortfolioForm, setShowPortfolioForm] = useState(false);
   const [editingPortfolioId, setEditingPortfolioId] = useState<string | null>(null);
   const [portfolioForm, setPortfolioForm] = useState({
@@ -343,7 +359,7 @@ export default function AdminPanel({
     imageUrl: ""
   });
 
-  // Artisan management states
+  // สถานะสำหรับจัดการข้อมูลช่างฝีมือ
   const [showArtisanForm, setShowArtisanForm] = useState(false);
   const [editingArtisanId, setEditingArtisanId] = useState<string | null>(null);
   const [artisanForm, setArtisanForm] = useState({
@@ -353,7 +369,7 @@ export default function AdminPanel({
     imageUrl: ""
   });
 
-  // Landmark/Map management states
+  // สถานะสำหรับจัดการสถานที่สำคัญและพิกัดบนแผนที่
   const [showLandmarkForm, setShowLandmarkForm] = useState(false);
   const [editingLandmarkId, setEditingLandmarkId] = useState<string | null>(null);
   const [landmarkForm, setLandmarkForm] = useState<{
@@ -374,7 +390,7 @@ export default function AdminPanel({
     imageUrl: ""
   });
 
-  // Load Admin metrics stats
+  // โหลดข้อมูลสถิติและยอดรวมที่ใช้แสดงบนแดชบอร์ดผู้ดูแลระบบ
   const fetchDashStats = async () => {
     try {
       setLoading(true);
@@ -395,7 +411,7 @@ export default function AdminPanel({
     }
   };
 
-  // Load generated PHP source code files
+  // โหลดไฟล์โค้ด PHP และคำแนะนำที่ระบบสร้างไว้สำหรับการส่งออก
   const fetchPHPScripts = async () => {
     try {
       const res = await fetch("/api/php-exporter/files");
@@ -414,7 +430,7 @@ export default function AdminPanel({
     }
   };
 
-  // User management operations
+  // โหลดรายชื่อผู้ใช้ทั้งหมดสำหรับหน้าเมนูจัดการสมาชิก
   const fetchUsers = async () => {
     try {
       setUserListLoading(true);
@@ -438,6 +454,7 @@ export default function AdminPanel({
   };
 
   const handleDeleteUser = (id: string) => {
+    // ป้องกันการลบบัญชีผู้ดูแลหลัก และขอคำยืนยันก่อนลบผู้ใช้รายอื่น
     if (id === "usr-admin") {
       showCustomAlert("เกิดข้อผิดพลาด", "ไม่สามารถลบผู้ดูแลระบบหลัก (admin) เพื่อป้องกันข้อผิดพลาดทางสิทธิ์ระบบได้ค่ะ", "error");
       return;
@@ -472,9 +489,11 @@ export default function AdminPanel({
   };
 
   const handleUserSubmit = async (e: React.FormEvent) => {
+    // ใช้ฟอร์มเดียวกันสำหรับสร้างสมาชิกใหม่และแก้ไขสมาชิกเดิม
     e.preventDefault();
     try {
       const isEditing = !!editingUserId;
+      // เลือก URL และ HTTP method ตามว่าเป็นการเพิ่มใหม่หรือแก้ไข
       const url = isEditing ? `/api/users/${editingUserId}` : `/api/users/register`;
       const method = isEditing ? "PUT" : "POST";
 
@@ -518,6 +537,7 @@ export default function AdminPanel({
   };
 
   const handleStartEditUser = (u: User) => {
+    // นำข้อมูลผู้ใช้ที่เลือกมาใส่ในแบบฟอร์มเพื่อเริ่มแก้ไข
     setEditingUserId(u.id);
     setUserForm({
       username: u.username,
@@ -530,6 +550,7 @@ export default function AdminPanel({
   };
 
   const fetchTransactions = async () => {
+    // ดึงรายการธุรกรรมและคำสั่งซื้อที่ผู้ดูแลมีสิทธิ์ดู
     setTxLoading(true);
     try {
       const res = await fetch("/api/transactions", {
@@ -547,6 +568,7 @@ export default function AdminPanel({
   };
 
   const handleUpdateTrackingSubmit = async (txId: string) => {
+    // บันทึกสถานะจัดส่ง บริษัทขนส่ง เลขพัสดุ และหมายเหตุของคำสั่งซื้อ
     try {
       const res = await fetch(`/api/transactions/${txId}/tracking`, {
         method: "PUT",
@@ -572,6 +594,7 @@ export default function AdminPanel({
   };
 
   useEffect(() => {
+    // โหลดข้อมูลให้ตรงกับเมนูทุกครั้งที่ผู้ดูแลเปลี่ยนแท็บ
     if (activeTab === "dashboard") {
       fetchDashStats();
     } else if (activeTab === "php-exporter") {
@@ -588,6 +611,7 @@ export default function AdminPanel({
   }, [activeTab]);
 
   const handleUpdateSettingsSubmit = async (e: React.FormEvent) => {
+    // บันทึกค่าตั้งค่าเว็บไซต์ที่แก้ไขกลับไปยังคอมโพเนนต์หลัก
     e.preventDefault();
     try {
       await onUpdateSettings(editedSettings);
@@ -598,6 +622,7 @@ export default function AdminPanel({
   };
 
   const handleDownloadBackup = async () => {
+    // ขอข้อมูลสำรองจากเซิร์ฟเวอร์ แล้วสร้างไฟล์ JSON ให้ผู้ใช้ดาวน์โหลด
     setBackupLoading(true);
     setBackupErrorMsg("");
     setBackupSuccessMsg("");
@@ -610,7 +635,7 @@ export default function AdminPanel({
       if (!res.ok) throw new Error("ไม่สามารถเรียกขอข้อมูลสำรองจากเซิร์ฟเวอร์");
       const dbData = await res.json();
       
-      // Create local file download
+      // สร้างลิงก์ชั่วคราวเพื่อดาวน์โหลดไฟล์สำรองลงในเครื่อง
       const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
         JSON.stringify(dbData, null, 2)
       )}`;
@@ -631,6 +656,7 @@ export default function AdminPanel({
   };
 
   const handleUploadBackup = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    // อ่านไฟล์ JSON ที่ผู้ใช้เลือก ตรวจโครงสร้าง แล้วส่งไปกู้คืนบนเซิร์ฟเวอร์
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -645,7 +671,7 @@ export default function AdminPanel({
           const content = event.target?.result as string;
           const backupData = JSON.parse(content);
 
-          // Quick schema validation
+          // ตรวจเบื้องต้นว่าไฟล์สำรองมีข้อมูลหลักที่ระบบต้องใช้ครบ
           if (!backupData.settings || !backupData.products || !backupData.categories) {
             setBackupErrorMsg("โครงสร้างไฟล์สำรองไม่ถูกต้อง (ต้องมีฟิลด์ settings, products และ categories)");
             setBackupLoading(false);
@@ -687,18 +713,18 @@ export default function AdminPanel({
     }
   };
 
-  // Portfolio actions handlers
+  // เพิ่มหรือแก้ไขผลงาน แล้วบันทึกรวมอยู่ในค่าตั้งค่าของเว็บไซต์
   const handlePortfolioSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       let updatedPortfolios = [...(editedSettings.portfolios || [])];
       if (editingPortfolioId) {
-        // Edit existing
+        // แก้ไขผลงานเดิมที่มีรหัสตรงกัน
         updatedPortfolios = updatedPortfolios.map(p => 
           p.id === editingPortfolioId ? { ...p, ...portfolioForm } : p
         );
       } else {
-        // Add new
+        // สร้างผลงานใหม่พร้อมรหัสจากเวลาปัจจุบัน
         const newPort = {
           id: `port-${Date.now()}`,
           ...portfolioForm
@@ -710,7 +736,7 @@ export default function AdminPanel({
       setEditedSettings(newSettings);
       await onUpdateSettings(newSettings);
       
-      // Reset form
+      // ล้างข้อมูลและปิดแบบฟอร์มหลังบันทึกสำเร็จ
       setPortfolioForm({ title: "", description: "", imageUrl: "" });
       setEditingPortfolioId(null);
       setShowPortfolioForm(false);
@@ -721,6 +747,7 @@ export default function AdminPanel({
   };
 
   const handleDeletePortfolio = (id: string) => {
+    // ขอคำยืนยันก่อนนำผลงานที่เลือกออกจากรายการ
     setConfirmDialog({
       isOpen: true,
       title: "ยืนยันการลบผลงาน",
@@ -739,18 +766,18 @@ export default function AdminPanel({
     });
   };
 
-  // Artisan actions handlers
+  // เพิ่มหรือแก้ไขข้อมูลช่างฝีมือ แล้วบันทึกลงค่าตั้งค่าเว็บไซต์
   const handleArtisanSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       let updatedArtisans = [...(editedSettings.artisans || [])];
       if (editingArtisanId) {
-        // Edit existing
+        // แก้ไขข้อมูลช่างฝีมือเดิมที่มีรหัสตรงกัน
         updatedArtisans = updatedArtisans.map(a => 
           a.id === editingArtisanId ? { ...a, ...artisanForm } : a
         );
       } else {
-        // Add new
+        // เพิ่มข้อมูลช่างฝีมือรายการใหม่
         const newArt = {
           id: `art-${Date.now()}`,
           ...artisanForm
@@ -762,7 +789,7 @@ export default function AdminPanel({
       setEditedSettings(newSettings);
       await onUpdateSettings(newSettings);
       
-      // Reset form
+      // ล้างข้อมูลและปิดแบบฟอร์มหลังบันทึกสำเร็จ
       setArtisanForm({ name: "", expertise: "", bio: "", imageUrl: "" });
       setEditingArtisanId(null);
       setShowArtisanForm(false);
@@ -773,6 +800,7 @@ export default function AdminPanel({
   };
 
   const handleDeleteArtisan = (id: string) => {
+    // ขอคำยืนยันก่อนลบช่างฝีมือออกจากทำเนียบ
     setConfirmDialog({
       isOpen: true,
       title: "ยืนยันการลบข้อมูลช่างฝีมือ",
@@ -791,18 +819,18 @@ export default function AdminPanel({
     });
   };
 
-  // Landmark/Map action handlers
+  // เพิ่มหรือแก้ไขสถานที่สำคัญ รวมถึงประเภท พิกัด และข้อมูลติดต่อ
   const handleLandmarkSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
       let updatedLandmarks = [...(editedSettings.landmarks || [])];
       if (editingLandmarkId) {
-        // Edit existing
+        // แก้ไขข้อมูลสถานที่เดิมที่มีรหัสตรงกัน
         updatedLandmarks = updatedLandmarks.map(l => 
           l.id === editingLandmarkId ? { ...l, ...landmarkForm } : l
         );
       } else {
-        // Add new
+        // เพิ่มสถานที่ใหม่พร้อมรหัสเฉพาะ
         const newLandmark = {
           id: `loc-${Date.now()}`,
           ...landmarkForm
@@ -814,7 +842,7 @@ export default function AdminPanel({
       setEditedSettings(newSettings);
       await onUpdateSettings(newSettings);
       
-      // Reset form
+      // คืนค่าแบบฟอร์มสถานที่กลับเป็นค่าเริ่มต้น
       setLandmarkForm({ name: "", type: "craft", lat: 7.0518, lng: 100.5285, description: "", phone: "", imageUrl: "" });
       setEditingLandmarkId(null);
       setShowLandmarkForm(false);
@@ -825,6 +853,7 @@ export default function AdminPanel({
   };
 
   const handleDeleteLandmark = (id: string) => {
+    // ขอคำยืนยันก่อนลบสถานที่ออกจากรายการแผนที่
     setConfirmDialog({
       isOpen: true,
       title: "ยืนยันการลบลำดับพิกัดสถานที่",
@@ -843,7 +872,7 @@ export default function AdminPanel({
     });
   };
 
-  // Product actions handler
+  // สร้างหรือแก้ไขสินค้า โดยแปลงข้อความสต็อกแต่ละบรรทัดเป็นอาร์เรย์ก่อนส่ง API
   const handleProductSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const stockArr = productForm.stockText.split("\n").map(l => l.trim()).filter(Boolean);
@@ -880,6 +909,7 @@ export default function AdminPanel({
   };
 
   const deleteProduct = (id: string) => {
+    // แสดงกล่องยืนยันและเรียก API เพื่อลบสินค้าที่เลือก
     setConfirmDialog({
       isOpen: true,
       title: "ยืนยันการลบสินค้า",
@@ -899,7 +929,7 @@ export default function AdminPanel({
     });
   };
 
-  // Category actions handler
+  // สร้างหรือแก้ไขหมวดหมู่ โดยเลือก POST หรือ PUT ตามสถานะการแก้ไข
   const handleCategorySubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const method = editingCategoryId ? "PUT" : "POST";
@@ -923,6 +953,7 @@ export default function AdminPanel({
   };
 
   const deleteCategory = (id: string) => {
+    // แสดงคำเตือนก่อนลบหมวดหมู่สินค้า
     setConfirmDialog({
       isOpen: true,
       title: "ยืนยันการลบหมวดหมู่",
@@ -942,7 +973,7 @@ export default function AdminPanel({
     });
   };
 
-  // Coupon actions handler
+  // ส่งข้อมูลคูปองใหม่ไปบันทึก และล้างแบบฟอร์มเมื่อสำเร็จ
   const handleCouponSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     const res = await fetch("/api/coupons", {
@@ -963,6 +994,7 @@ export default function AdminPanel({
   };
 
   const deleteCoupon = (code: string) => {
+    // ขอคำยืนยันก่อนลบคูปองตามรหัสที่ระบุ
     setConfirmDialog({
       isOpen: true,
       title: "ยืนยันการลบคูปองส่วนลด",
@@ -983,12 +1015,14 @@ export default function AdminPanel({
   };
 
   const handleCopyCode = (content: string, index: number) => {
+    // คัดลอกโค้ดไปยังคลิปบอร์ด และแสดงสถานะว่าคัดลอกแล้วเป็นเวลา 2 วินาที
     navigator.clipboard.writeText(content);
     setCopiedFileIndex(index);
     setTimeout(() => setCopiedFileIndex(null), 2000);
   };
 
   const getPrimaryPreset = (color: string) => {
+    // แปลงค่าสีหลักของเว็บไซต์ให้เป็นชื่อชุดสีที่ส่วนติดต่อผู้ใช้รองรับ
     if (!color) return "amber";
     const c = color.toLowerCase();
     if (c.startsWith("#")) {
@@ -1007,6 +1041,7 @@ export default function AdminPanel({
 
   const preset = getPrimaryPreset(settings.primaryColor);
 
+  // เลือกคลาสสีข้อความ เส้นขอบ และพื้นหลังให้ตรงกับชุดสีหลักของเว็บไซต์
   const activeColor = 
     preset === 'crimson' ? 'text-red-500' : 
     preset === 'cyan' ? 'text-cyan-400' : 
@@ -1050,7 +1085,7 @@ export default function AdminPanel({
     >
       <div className="relative w-full max-w-6xl rounded-3xl bg-[#16161A] border border-white/10 p-4 sm:p-7 shadow-2xl z-10 flex flex-col max-h-[96vh] h-[92vh] md:h-[90vh]">
         
-        {/* Head Bar */}
+        {/* แถบหัวของหน้าต่างแผงควบคุม */}
         <div className="flex items-center justify-between pb-4 border-b border-white/[0.06]">
           <div className="flex items-center gap-2">
             <LayoutDashboard size={18} className="text-amber-500" />
@@ -1064,10 +1099,10 @@ export default function AdminPanel({
           </button>
         </div>
 
-        {/* Dynamic Split Frame: Left Sidebar Tabs / Right Details Workspace */}
+        {/* โครงหน้าจอแบบแบ่งสองส่วน: เมนูด้านซ้ายและพื้นที่ทำงานด้านขวา */}
         <div className="flex flex-col md:grid md:grid-cols-12 gap-5 pt-4 flex-1 min-h-0 overflow-hidden">
           
-          {/* LEFT Sidebar controls */}
+          {/* เมนูด้านซ้ายสำหรับเลือกส่วนที่ต้องการจัดการ */}
           <div className="flex-shrink-0 md:col-span-3 flex md:flex-col gap-1.5 overflow-x-auto md:overflow-x-visible pb-2.5 md:pb-0 border-b md:border-b-0 md:border-r border-white/5 pr-0 md:pr-4 scrollbar-thin">
             <button
               onClick={() => setActiveTab("dashboard")}
@@ -1198,10 +1233,10 @@ export default function AdminPanel({
             </button>
           </div>
 
-          {/* RIGHT Workspace Details */}
+          {/* พื้นที่ด้านขวาสำหรับแสดงรายละเอียดของเมนูที่เลือก */}
           <div className="flex-1 min-h-0 md:col-span-9 overflow-y-auto pr-1 flex flex-col h-full pb-4">
             
-            {/* T1: Statistics Dashboard */}
+            {/* แท็บแดชบอร์ดสำหรับแสดงภาพรวมและสถิติของระบบ */}
             {activeTab === "dashboard" && (
               <div className="space-y-6">
                 <span className="text-xs text-slate-500 font-semibold block">สถิติความเคลื่อนไหว (ยอดขาย & ธุรกรรมของลูกค้าร้าน)</span>
@@ -1209,7 +1244,7 @@ export default function AdminPanel({
                   <p className="text-xs text-slate-400 py-10 text-center animate-pulse">กำลังสถิติความเคลื่อนไหว...</p>
                 ) : (
                   <>
-                    {/* Revenue blocks grid */}
+                    {/* กล่องสรุปยอดรายได้แยกตามประเภท */}
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div className="p-4 rounded-2xl bg-slate-950 border border-white/5 space-y-1">
                         <span className="text-[10px] uppercase tracking-wider font-extrabold text-blue-400">รายได้รวมทั้งหมด</span>
@@ -1223,7 +1258,7 @@ export default function AdminPanel({
                       </div>
                     </div>
 
-                    {/* Quantity badges */}
+                    {/* ป้ายแสดงจำนวนข้อมูลสำคัญในระบบ */}
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                       <div className="p-3 bg-slate-950/50 rounded-xl border border-white/5 text-center">
                         <span className="text-[9px] text-slate-500 font-bold block uppercase">สมาชิกทั้งหมด</span>
@@ -1243,7 +1278,7 @@ export default function AdminPanel({
                       </div>
                     </div>
 
-                    {/* Developer Note */}
+                    {/* หมายเหตุสำหรับผู้ดูแลหรือผู้พัฒนาระบบ */}
                     <div className="p-4 bg-amber-500/10 border border-amber-500/20 text-amber-400 rounded-xl leading-relaxed text-xs">
                       ⚡ <strong>ระบบร้านค้าพร้อมคลังพรีเมียมทำงานสำเร็จรูป:</strong> ข้อมูลสถิติของร้านค้าทั้งหมด (จำนวนผู้ดูแล, ยอดถอนเงินสด, สลิปสแกน QR, สต็อก) จัดการและเก็บข้อมูลง่ายดายบนความจำระบบเซิร์ฟเวอร์แบบ persistence สะท้อนสถิติตามจริงได้ทันที ณ ทุกการซื้อ/สุ่มในระบบ!
                     </div>
@@ -1252,7 +1287,7 @@ export default function AdminPanel({
               </div>
             )}
 
-            {/* T2: Products Management CRUD inside dashboard workspace */}
+            {/* แท็บจัดการสินค้า: เพิ่ม อ่าน แก้ไข และลบข้อมูล */}
             {activeTab === "products" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1272,7 +1307,7 @@ export default function AdminPanel({
                   </button>
                 </div>
 
-                {/* Form view */}
+                {/* แบบฟอร์มเพิ่มหรือแก้ไขสินค้า */}
                 {showProductForm && (
                   <form onSubmit={handleProductSubmit} className="p-4 rounded-2xl bg-slate-950 border border-white/10 space-y-3.5 text-xs text-slate-200">
                     <h3 className="font-extrabold text-white">{editingProductId ? "แก้ไขสินค้า" : "สร้างสินค้าคลังตัวใหม่"}</h3>
@@ -1319,7 +1354,7 @@ export default function AdminPanel({
                         <input type="url" value={productForm.videoUrl} onChange={e => setProductForm({...productForm, videoUrl: e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-white" placeholder="เช่น https://www.youtube.com/watch?v=xxxxxx หรือ https://youtu.be/xxxxxx" />
                       </div>
 
-                      {/* Stock keys list */}
+                      {/* ช่องกรอกรายการสต็อก โดยใช้หนึ่งรายการต่อหนึ่งบรรทัด */}
                       <div className="col-span-2">
                         <label className="block mb-1 text-[10px] text-slate-400">
                           {productForm.type === 'normal' 
@@ -1337,7 +1372,7 @@ export default function AdminPanel({
                   </form>
                 )}
 
-                {/* Table list */}
+                {/* ตารางแสดงรายการสินค้าทั้งหมด */}
                 <div className="overflow-x-auto rounded-2xl border border-white/5">
                   <table className="w-full text-left border-collapse text-xs text-slate-300">
                     <thead className="bg-slate-950 font-extrabold text-[#ffffff]">
@@ -1387,7 +1422,7 @@ export default function AdminPanel({
               </div>
             )}
 
-            {/* T3: Categories Management */}
+            {/* แท็บจัดการหมวดหมู่สินค้า */}
             {activeTab === "categories" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1405,7 +1440,7 @@ export default function AdminPanel({
                   </button>
                 </div>
 
-                {/* Form view */}
+                {/* แบบฟอร์มเพิ่มหรือแก้ไขหมวดหมู่ */}
                 {showCategoryForm && (
                   <form onSubmit={handleCategorySubmit} className="p-4 rounded-2xl bg-slate-950 border border-white/10 space-y-3.5 text-xs text-slate-200">
                     <h3 className="font-extrabold text-white">{editingCategoryId ? "แก้ไขหมวดหมู่" : "สร้างหมวดหมู่ใหม่"}</h3>
@@ -1444,7 +1479,7 @@ export default function AdminPanel({
                   </form>
                 )}
 
-                {/* Categories Table list */}
+                {/* ตารางแสดงรายการหมวดหมู่ทั้งหมด */}
                 <div className="overflow-x-auto rounded-2xl border border-white/5">
                   <table className="w-full text-left border-collapse text-xs text-slate-300">
                     <thead className="bg-slate-950 font-extrabold">
@@ -1494,7 +1529,7 @@ export default function AdminPanel({
               </div>
             )}
 
-            {/* T4: Coupon Codes Management */}
+            {/* แท็บจัดการรหัสคูปองส่วนลด */}
             {activeTab === "coupons" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1508,7 +1543,7 @@ export default function AdminPanel({
                   </button>
                 </div>
 
-                {/* Form */}
+                {/* แบบฟอร์มสร้างคูปองใหม่ */}
                 {showCouponForm && (
                   <form onSubmit={handleCouponSubmit} className="p-4 rounded-2xl bg-slate-950 border border-white/10 space-y-3 text-xs text-slate-200">
                     <h3 className="font-extrabold text-white">สร้างรหัสส่วนลดใหม่</h3>
@@ -1537,7 +1572,7 @@ export default function AdminPanel({
                   </form>
                 )}
 
-                {/* Table */}
+                {/* ตารางแสดงคูปองทั้งหมด */}
                 <div className="overflow-x-auto rounded-2xl border border-white/5">
                   <table className="w-full text-left border-collapse text-xs text-slate-300">
                     <thead className="bg-slate-950 font-extrabold">
@@ -1574,7 +1609,7 @@ export default function AdminPanel({
               </div>
             )}
 
-            {/* T4.5: Users & Credit Management */}
+            {/* แท็บจัดการสมาชิก บทบาท และเครดิต */}
             {activeTab === "users" && (
               <div className="space-y-4">
                 <div className="flex items-center justify-between">
@@ -1592,7 +1627,7 @@ export default function AdminPanel({
                   </button>
                 </div>
 
-                {/* Create/Edit User Form */}
+                {/* แบบฟอร์มสร้างหรือแก้ไขผู้ใช้งาน */}
                 {showUserForm && (
                   <form onSubmit={handleUserSubmit} className="p-4 rounded-2xl bg-slate-950 border border-white/10 space-y-3 text-xs text-slate-200">
                     <h3 className="font-extrabold text-white text-sm">
@@ -1631,7 +1666,7 @@ export default function AdminPanel({
                         />
                       </div>
 
-                      {/* Role selection -> Only shown when editing or explicitly available */}
+                      {/* ตัวเลือกบทบาท จะแสดงเมื่ออยู่ในเงื่อนไขที่อนุญาต */}
                       <div>
                         <label className="block mb-1 text-[10px] text-stone-400">บทบาท (Role)*</label>
                         <select 
@@ -1644,7 +1679,7 @@ export default function AdminPanel({
                         </select>
                       </div>
 
-                      {/* Balance / Credits input */}
+                      {/* ช่องกรอกยอดเงินหรือเครดิตของสมาชิก */}
                       <div>
                         <label className="block mb-1 text-[10px] text-stone-400 font-bold text-emerald-400">จำนวนเครดิต / ยอดเงินคงเหลือ (฿)*</label>
                         <input 
@@ -1680,7 +1715,7 @@ export default function AdminPanel({
                   </form>
                 )}
 
-                {/* Display Users management Table / Grid layout */}
+                {/* ตารางหรือกริดสำหรับแสดงและจัดการผู้ใช้งาน */}
                 {userListLoading ? (
                   <div className="py-8 text-center text-xs text-slate-400">กำลังตรวจค้นดึงสารบรรณรายชื่อสมาชิก...</div>
                 ) : (
@@ -1784,7 +1819,7 @@ export default function AdminPanel({
               </div>
             )}
 
-            {/* T_about_us: About Us Settings */}
+            {/* แท็บแก้ไขเนื้อหาหน้าเกี่ยวกับเรา */}
             {activeTab === "about-us" && (
               <form onSubmit={handleUpdateSettingsSubmit} className="space-y-4 text-xs text-slate-300 animate-fadeIn">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
@@ -1834,7 +1869,7 @@ export default function AdminPanel({
               </form>
             )}
 
-            {/* T_portfolios: Portfolio Management */}
+            {/* แท็บจัดการแฟ้มผลงานศิลปหัตถกรรม */}
             {activeTab === "portfolios" && (
               <div className="space-y-4 text-xs text-slate-300 animate-fadeIn">
                 <div className="flex items-center justify-between">
@@ -1961,7 +1996,7 @@ export default function AdminPanel({
               </div>
             )}
 
-            {/* T_artisans: Artisan Directory */}
+            {/* แท็บจัดการทำเนียบช่างฝีมือ */}
             {activeTab === "artisans" && (
               <div className="space-y-4 text-xs text-slate-300 animate-fadeIn">
                 <div className="flex items-center justify-between">
@@ -2100,7 +2135,7 @@ export default function AdminPanel({
               </div>
             )}
 
-            {/* T_landmarks: Landmark/Map Directory */}
+            {/* แท็บจัดการสถานที่สำคัญและพิกัดแผนที่ */}
             {activeTab === "landmarks" && (
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
@@ -2306,7 +2341,7 @@ export default function AdminPanel({
               </div>
             )}
 
-            {/* T5: Site Settings editor */}
+            {/* แท็บแก้ไขการตั้งค่าหลักของเว็บไซต์ */}
             {activeTab === "settings" && (
               <>
                 <form onSubmit={handleUpdateSettingsSubmit} className="space-y-4 text-xs text-slate-300">
@@ -2358,7 +2393,7 @@ export default function AdminPanel({
                     <input type="url" required value={editedSettings.contactLine} onChange={e => setEditedSettings({...editedSettings, contactLine: e.target.value})} className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-white" />
                   </div>
 
-                  {/* CUSTOM DECORATION COLOR PICKER */}
+                  {/* เครื่องมือเลือกสีตกแต่งหลักของเว็บไซต์ */}
                   <div className="col-span-2 border-t border-white/5 pt-4 mt-2">
                     <span className="text-[11px] font-bold text-teal-400 block mb-2 uppercase tracking-wide">🎨 ตกแต่งโทนสีภาพลักษณ์เว็บไซต์ (Website Theme Color Decorator)</span>
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-slate-900/60 p-3.5 rounded-xl border border-white/5">
@@ -2417,12 +2452,12 @@ export default function AdminPanel({
                     </div>
                   </div>
 
-                  {/* CAROUSEL SLIDER MANAGEMENT */}
+                  {/* ส่วนจัดการรูปภาพสไลด์บนหน้าเว็บไซต์ */}
                   <div className="col-span-2 border-t border-white/5 pt-4 mt-2">
                     <span className="text-[11px] font-bold text-teal-400 block mb-2 uppercase tracking-wide">🖼️ ระบบอัปโหลดและจัดการรูปภาพสไลด์หน้าโฮมเพจ (Homepage Carousel Slides)</span>
                     <div className="bg-slate-900/60 p-4 rounded-xl border border-white/5 space-y-4">
                       
-                      {/* Current list of banner images */}
+                      {/* รายการภาพแบนเนอร์ที่ใช้งานอยู่ในปัจจุบัน */}
                       <label className="block text-[10px] text-slate-400 font-bold mb-1">📋 รายการภาพสไลด์ที่กำลังใช้งานอยู่ในปัจจุบัน (คลิกลากเพื่อจัดลำดับ/แก้ไขได้ทันที):</label>
                       <div className="space-y-2.5 max-h-52 overflow-y-auto pr-1 scrollbar-thin">
                         {(editedSettings.banners || []).map((slide, sIdx) => (
@@ -2502,7 +2537,7 @@ export default function AdminPanel({
                         )}
                       </div>
 
-                      {/* Add new slide interface */}
+                      {/* ส่วนสำหรับเพิ่มภาพสไลด์รายการใหม่ */}
                       <div className="border-t border-white/[0.05] pt-3.5 space-y-3">
                         <div className="flex flex-col sm:flex-row items-end gap-2">
                           <div className="flex-grow w-full">
@@ -2531,7 +2566,7 @@ export default function AdminPanel({
                           </button>
                         </div>
 
-                        {/* Presets galleries */}
+                        {/* แกลเลอรีภาพตัวอย่างสำเร็จรูป */}
                         <div className="p-2 bg-slate-950/50 rounded-xl border border-white/5">
                           <span className="text-[8.5px] font-bold text-slate-400 block mb-1.5 uppercase tracking-wide">💡 รวมชุดภาพอัตลักษณ์วิถีชีวิตไทยและหัตถศิลป์ชุมชนน้ำน้อยพรีเซ็ต (เพิ่มใน 1-Click):</span>
                           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
@@ -2563,7 +2598,7 @@ export default function AdminPanel({
                   </div>
                 </div>
 
-                {/* ANNOUNCEMENT POPUP CONFIGURATION BLOCK */}
+                {/* ส่วนตั้งค่าป๊อปอัปประกาศข่าวสาร */}
                 <div className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 space-y-3">
                   <div className="flex items-center justify-between border-b border-white/5 pb-2">
                     <div>
@@ -2586,7 +2621,7 @@ export default function AdminPanel({
 
                   {editedSettings.announcementActive && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                      {/* Form Inputs */}
+                      {/* ช่องกรอกข้อมูลสำหรับตั้งค่าประกาศ */}
                       <div className="space-y-3">
                         <div>
                           <label className="block mb-1 text-[10px] text-slate-400">หัวข้อประกาศข่าวสาร (Announcement Title) *</label>
@@ -2622,7 +2657,7 @@ export default function AdminPanel({
                         </div>
                       </div>
 
-                      {/* Real-time live mini preview */}
+                      {/* ตัวอย่างประกาศขนาดเล็กที่เปลี่ยนตามค่าที่กรอกทันที */}
                       <div className="bg-slate-900/40 p-3 rounded-xl border border-dashed border-white/10 flex flex-col justify-between">
                         <div>
                           <span className="text-[9px] font-bold text-teal-400 block mb-2 uppercase tracking-wide">🔍 จำลองมุมมองตัวอย่าง (Live Preview)</span>
@@ -2649,7 +2684,7 @@ export default function AdminPanel({
                   )}
                 </div>
 
-                {/* SEASONAL EFFECTS CONFIGURATION BLOCK */}
+                {/* ส่วนตั้งค่าเอฟเฟกต์ตกแต่งตามเทศกาล */}
                 <div className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 space-y-3">
                   <div>
                     <span className="text-[11px] font-bold text-teal-400 block uppercase tracking-wide">🎉 ระบบเอฟเฟกต์ตามเทศกาล (Seasonal Effects)</span>
@@ -2689,7 +2724,7 @@ export default function AdminPanel({
                   </div>
                 </div>
 
-                {/* WEBSITE BACKGROUND CONFIGURATION BLOCK */}
+                {/* ส่วนตั้งค่าภาพพื้นหลังของเว็บไซต์ */}
                 <div className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 space-y-3">
                   <div>
                     <span className="text-[11px] font-bold text-teal-400 block uppercase tracking-wide">🖼️ ระบบพื้นหลังของเว็บไซต์ (Website Background Image / Style)</span>
@@ -2752,7 +2787,7 @@ export default function AdminPanel({
                   </div>
                 </div>
 
-                {/* PERSISTENT ANNOUNCEMENT BAR CONFIGURATION BLOCK */}
+                {/* ส่วนตั้งค่าแถบประกาศแบบแสดงต่อเนื่อง */}
                 <div className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 space-y-3">
                   <div className="flex items-center justify-between border-b border-white/5 pb-2">
                     <div>
@@ -2776,7 +2811,7 @@ export default function AdminPanel({
                    {editedSettings.announcementBarActive && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
                       <div className="md:col-span-2 space-y-3.5">
-                        {/* Text and Prefix tag */}
+                        {/* ข้อความประกาศและป้ายคำนำหน้า */}
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                           <div className="sm:col-span-2">
                             <label className="block mb-1 text-[10px] text-slate-400">ข้อความประกาศวิ่ง/ปกติ (Announcement Text) *</label>
@@ -2801,7 +2836,7 @@ export default function AdminPanel({
                           </div>
                         </div>
 
-                        {/* Premium Style Presets */}
+                        {/* รูปแบบแถบประกาศสำเร็จรูป */}
                         <div className="space-y-1">
                           <label className="block text-[10px] text-slate-400">👑 สไตล์แถบประกาศระดับพรีเมียม (Premium Style Presets)</label>
                           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-0.5">
@@ -2831,7 +2866,7 @@ export default function AdminPanel({
                           </div>
                         </div>
 
-                        {/* Speed range slider */}
+                        {/* แถบเลื่อนสำหรับกำหนดความเร็วของข้อความ */}
                         <div className="space-y-1">
                           <div className="flex justify-between items-center">
                             <label className="block text-[10px] text-slate-400">⏱️ ความเร็วในการเลื่อนข้อความ (Speed Duration: {editedSettings.announcementBarSpeed || 25} วินาที)</label>
@@ -2855,7 +2890,7 @@ export default function AdminPanel({
                           </p>
                         </div>
 
-                        {/* Color inputs (only shown for solid or custom styling) */}
+                        {/* ตัวเลือกสี จะแสดงเมื่อใช้รูปแบบสีพื้นหรือกำหนดเอง */}
                         <div className="grid grid-cols-2 gap-3 pt-0.5">
                           <div>
                             <label className="block mb-1 text-[10px] text-slate-400">สีพื้นหลัง (Background Color - สำหรับสีปกติ)</label>
@@ -2898,7 +2933,7 @@ export default function AdminPanel({
                           </div>
                         </div>
 
-                        {/* Presets */}
+                        {/* ชุดสีตัวอย่างที่เลือกใช้ได้ทันที */}
                         <div className="space-y-1 pt-1">
                           <span className="text-[8.5px] font-bold text-slate-400 block uppercase tracking-wide">🎨 ชุดธีมสีแนะนำพิเศษ (Preset Luxury Themes):</span>
                           <div className="flex flex-wrap gap-1.5">
@@ -2928,11 +2963,11 @@ export default function AdminPanel({
                         </div>
                       </div>
 
-                      {/* Live preview for Marquee */}
+                      {/* ตัวอย่างแถบข้อความเลื่อนแบบทันที */}
                       <div className="bg-slate-900/40 p-4 rounded-xl border border-dashed border-white/10 flex flex-col justify-between space-y-3">
                         <span className="text-[9px] font-bold text-teal-400 block uppercase tracking-wide">🔍 จำลองแถบประกาศจริง (Live Announcement Preview)</span>
                         
-                        {/* Simulation Bar */}
+                        {/* แถบจำลองผลลัพธ์ก่อนบันทึก */}
                         {(() => {
                           const barStyle = editedSettings.announcementBarStyle || "solid";
                           let previewBg = "border border-white/5";
@@ -2994,7 +3029,7 @@ export default function AdminPanel({
                   )}
                 </div>
 
-                {/* FLOATING ANIMATED ANNOUNCEMENT CONFIGURATION BLOCK */}
+                {/* ส่วนตั้งค่ากล่องประกาศลอยแบบเคลื่อนไหว */}
                 <div className="bg-slate-950/40 p-4 rounded-2xl border border-white/5 space-y-3">
                   <div className="flex items-center justify-between border-b border-white/5 pb-2">
                     <div>
@@ -3017,7 +3052,7 @@ export default function AdminPanel({
 
                   {editedSettings.announcementFloatActive && (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1 text-xs">
-                      {/* Form Inputs */}
+                      {/* ช่องกรอกข้อมูลสำหรับกล่องประกาศลอย */}
                       <div className="space-y-3">
                         <div>
                           <label className="block mb-1 text-[10px] text-slate-400 font-bold">ข้อความที่ต้องการประกาศ (Announcement Float Text) *</label>
@@ -3078,13 +3113,13 @@ export default function AdminPanel({
                         </div>
                       </div>
 
-                      {/* Floating Mini Live Preview */}
+                      {/* ตัวอย่างกล่องประกาศลอยขนาดเล็ก */}
                       <div className="bg-slate-900/40 p-3 rounded-xl border border-dashed border-white/10 flex flex-col justify-between">
                         <div>
                           <span className="text-[9px] font-bold text-teal-400 block mb-2 uppercase tracking-wide">🔍 จำลองป้ายประกาศลอยจริง (Animated Floating Preview)</span>
                           
                           <div className="py-2 flex justify-center items-center h-24 bg-slate-950/60 rounded-lg relative overflow-hidden">
-                            {/* Animated sample floating card inside admin */}
+                            {/* การ์ดตัวอย่างแบบเคลื่อนไหวภายในหน้าผู้ดูแล */}
                             <div className="flex items-center gap-2.5 p-3 rounded-2xl border max-w-xs shadow-lg animate-bounce duration-1000 bg-[#FCFAF7] dark:bg-[#1A1612] border-amber-500/30 text-amber-700 dark:text-[#E2C7A9] shadow-amber-500/5">
                               <span className="text-base flex-shrink-0 animate-pulse">
                                 {editedSettings.announcementFloatIcon === 'welcome' ? '🎉' :
@@ -3111,7 +3146,7 @@ export default function AdminPanel({
                     </div>
                   )}
 
-                  {/* LUXURY PRODUCT RECOMMENDATION SLIDER CONFIGURATION */}
+                  {/* ส่วนตั้งค่าสไลด์สินค้าแนะนำ */}
                   <div className="col-span-2 border-t border-white/5 pt-4 mt-2">
                     <span className="text-[11px] font-bold text-amber-400 block mb-2 uppercase tracking-wide">🌟 ระบบแดชบอร์ดแนะนำสินค้าหรูหราหน้าเว็บ (Luxury Recommended Slider Dashboard)</span>
                     <div className="bg-slate-900/60 p-4 rounded-xl border border-white/5 space-y-4">
@@ -3186,7 +3221,7 @@ export default function AdminPanel({
                                     <input 
                                       type="checkbox" 
                                       checked={isSelected}
-                                      onChange={() => {}} // Controlled by outer card tap
+                                      onChange={() => {}} // ควบคุมการเลือกจากการกดที่การ์ดด้านนอก
                                       className="rounded bg-slate-950 border-white/10 text-amber-500 focus:ring-amber-500 focus:ring-offset-slate-900" 
                                     />
                                     <img src={prod.imageUrl} alt={prod.name} className="w-8 h-8 object-cover rounded bg-stone-900 flex-shrink-0" />
@@ -3206,7 +3241,7 @@ export default function AdminPanel({
                     </div>
                   </div>
 
-                  {/* RECENT ORDERS TICKER CONFIGURATION */}
+                  {/* ส่วนตั้งค่าแถบแสดงคำสั่งซื้อล่าสุด */}
                   <div className="col-span-2 border-t border-white/5 pt-4 mt-2">
                     <span className="text-[11px] font-bold text-violet-400 block mb-2 uppercase tracking-wide">🛒 ระบบแสดงรายการสั่งซื้อล่าสุดเลื่อนอัตโนมัติ (Live Recent Orders Ticker)</span>
                     <div className="bg-slate-900/60 p-4 rounded-xl border border-white/5 space-y-4">
@@ -3265,7 +3300,7 @@ export default function AdminPanel({
                     </div>
                   </div>
 
-                  {/* SITE MAINTENANCE CONFIGURATION */}
+                  {/* ส่วนตั้งค่าโหมดปิดปรับปรุงเว็บไซต์ */}
                   <div className="col-span-2 border-t border-white/5 pt-4 mt-2">
                     <span className="text-[11px] font-bold text-amber-500 block mb-2 uppercase tracking-wide">🔧 ระบบปรับปรุงเว็บไซต์ชั่วคราว (Site Maintenance Mode)</span>
                     <div className="bg-slate-900/60 p-4 rounded-xl border border-white/5 space-y-4">
@@ -3357,7 +3392,7 @@ export default function AdminPanel({
                 </div>
               </form>
 
-              {/* BACKUP & RESTORE SECTION */}
+              {/* ส่วนสำรองและกู้คืนข้อมูลของระบบ */}
               <div className="mt-8 bg-slate-950/40 p-5 rounded-2xl border border-white/5 space-y-4 text-xs">
                 <div className="flex items-center gap-2 border-b border-white/5 pb-3">
                   <Database size={16} className="text-teal-400" />
@@ -3380,7 +3415,7 @@ export default function AdminPanel({
                 )}
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
-                  {/* DOWNLOAD SECTION */}
+                  {/* ส่วนดาวน์โหลดไฟล์สำรองข้อมูล */}
                   <div className="bg-slate-950/60 p-4 rounded-xl border border-white/5 flex flex-col justify-between space-y-3">
                     <div className="space-y-1">
                       <span className="text-[11px] font-extrabold text-teal-400 block uppercase">1. ดาวน์โหลดข้อมูลสำรอง (Export)</span>
@@ -3397,7 +3432,7 @@ export default function AdminPanel({
                     </button>
                   </div>
 
-                  {/* UPLOAD SECTION */}
+                  {/* ส่วนอัปโหลดไฟล์เพื่อกู้คืนข้อมูล */}
                   <div className="bg-slate-950/60 p-4 rounded-xl border border-white/5 flex flex-col justify-between space-y-3">
                     <div className="space-y-1">
                       <span className="text-[11px] font-extrabold text-amber-400 block uppercase">2. กู้คืนข้อมูลผ่านไฟล์สำรอง (Import / Restore)</span>
@@ -3424,7 +3459,7 @@ export default function AdminPanel({
             </>
           )}
 
-            {/* Orders & Shipping Tracking tab */}
+            {/* แท็บจัดการคำสั่งซื้อและติดตามการจัดส่ง */}
             {activeTab === "orders" && (
               <div className="space-y-4 text-xs">
                 <div className="p-4 rounded-2xl bg-[#1e1e24] border border-white/5 text-slate-300">
@@ -3599,7 +3634,7 @@ export default function AdminPanel({
                   </div>
                 )}
 
-                {/* Tracking edit form drawer popup (Inline below table or highlighted) */}
+                {/* แบบฟอร์มแก้ไขข้อมูลติดตามพัสดุของรายการที่เลือก */}
                 {updatingTxId && (
                   <div className="bg-[#1e1e24] p-4 rounded-2xl border border-amber-500/20 space-y-3.5">
                     <div className="flex items-center justify-between">
@@ -3683,7 +3718,7 @@ export default function AdminPanel({
               </div>
             )}
 
-            {/* T6: The majestic PHP Exporter tab */}
+            {/* แท็บสร้างและส่งออกโค้ดระบบ PHP */}
             {activeTab === "php-exporter" && (
               <div className="space-y-4">
                 <div className="p-4 rounded-2xl bg-gradient-to-r from-teal-950/80 to-slate-950 border border-teal-500/20 text-slate-300 text-xs leading-relaxed space-y-2.5">
@@ -3696,7 +3731,7 @@ export default function AdminPanel({
                   </p>
                 </div>
 
-                {/* Grid file tabs inside PHP explorer */}
+                {/* แถบเลือกไฟล์ในหน้าต่างแสดงโค้ด PHP */}
                 <div className="grid grid-cols-4 gap-1 bg-slate-950 p-1 rounded-xl">
                   {exporterFiles.map((file, idx) => (
                     <button
@@ -3711,7 +3746,7 @@ export default function AdminPanel({
                   ))}
                 </div>
 
-                {/* Exporter Selected Code Area with Copy tool */}
+                {/* พื้นที่แสดงโค้ดของไฟล์ที่เลือก พร้อมปุ่มคัดลอก */}
                 {exporterFiles.length > 0 && (
                   <div className="relative rounded-2xl overflow-hidden border border-white/10 bg-slate-950 group">
                     <div className="flex items-center justify-between px-4 py-2 bg-slate-900/60 border-b border-white/5">
@@ -3740,7 +3775,7 @@ export default function AdminPanel({
                   </div>
                 )}
 
-                {/* PHP instructions and SQL Schemas */}
+                {/* คำแนะนำการใช้งาน PHP และโครงสร้างตาราง SQL */}
                 <div className="p-4 rounded-xl bg-slate-950 border border-dashed border-white/10">
                   <h5 className="text-[11px] font-extrabold text-white mb-2 uppercase tracking-wide">📦 วิธีการเตรียมตาราง SQL (Import schema):</h5>
                   <div className="max-h-56 overflow-y-auto pr-1">
@@ -3783,7 +3818,7 @@ CREATE TABLE IF NOT EXISTS users (
               </div>
             )}
 
-            {/* Seller Verifications (Admin tab) */}
+            {/* แท็บตรวจสอบและอนุมัติตัวตนผู้ขาย */}
             {activeTab === "seller-verifications" && (
               <div className="space-y-4 text-xs h-full overflow-y-auto pr-1">
                 <div className="p-4 rounded-2xl bg-[#1e1e24] border border-white/5 text-slate-300">
@@ -3935,7 +3970,7 @@ CREATE TABLE IF NOT EXISTS users (
               </div>
             )}
 
-            {/* Admin Withdrawals (Admin tab) */}
+            {/* แท็บตรวจสอบคำขอถอนเงินของผู้ขาย */}
             {activeTab === "admin-withdrawals" && (
               <div className="space-y-4 text-xs h-full overflow-y-auto pr-1">
                 <div className="p-4 rounded-2xl bg-[#1e1e24] border border-white/5 text-slate-300">
@@ -4031,7 +4066,7 @@ CREATE TABLE IF NOT EXISTS users (
                                     className="w-full bg-slate-900 border border-white/10 rounded-lg p-1.5 text-white text-[11px]"
                                   />
 
-                                  {/* Upload Transfer Slip for the Seller */}
+                                  {/* อัปโหลดสลิปการโอนเงินให้ผู้ขาย */}
                                   <div className="space-y-1 bg-white/[0.02] p-2 rounded-lg border border-white/5">
                                     <label className="block text-[10px] text-slate-400 font-bold uppercase tracking-wider">แนบสลิปการโอนเงินสด:</label>
                                     <div className="flex items-center gap-2">
@@ -4163,7 +4198,7 @@ CREATE TABLE IF NOT EXISTS users (
 
         </div>
 
-        {/* Custom Confirmation Modal */}
+        {/* กล่องยืนยันแบบกำหนดเองสำหรับการดำเนินการสำคัญ */}
         {confirmDialog.isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
             <div className="relative w-full max-w-md rounded-2xl bg-[#1c1c21] border border-white/10 p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
@@ -4192,7 +4227,7 @@ CREATE TABLE IF NOT EXISTS users (
           </div>
         )}
 
-        {/* Custom Alert Modal */}
+        {/* กล่องแจ้งผลสำเร็จ ข้อผิดพลาด หรือข้อมูลทั่วไป */}
         {alertState.isOpen && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-sm">
             <div className="relative w-full max-w-md rounded-2xl bg-[#1c1c21] border border-white/10 p-6 shadow-2xl animate-in fade-in zoom-in duration-200">
