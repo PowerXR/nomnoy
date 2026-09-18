@@ -478,14 +478,19 @@ export const categoryTranslations = {
 export const productTranslations = {
   "prod-1": {
     en: {
-      name: "🔑 High-Rank Valorant ID with Premium Rare Knives",
-      description: "Diamond rank account with popular Champion 2022+2023 knife skins, premium weapon skins, instant delivery, 30-day warranty!",
-      details: "### Account Features\n- Current Rank: **Diamond 2**\n- Knife Skin: **Champions 2022 Butterfly Knife** or **Champions 2023 Vandal**\n- Popular Vandal skins: Prime, Reaver, RGX\n- Change password and email instantly after purchase\n- 30-day warranty against retrieval or arbitrary bans\n\n*Please record a video from transaction start to account login for claims.*"
+      name: "Herbal Medicine",
+      description: "Folk wisdom for your good health.",
+      details: "Local wisdom for your well-being.
+Benefits include participation in the annual Kathin ceremony and support for small-scale sustainable livelihoods.
+Eco-friendly packaging using natural materials to reduce plastic waste.
+Easily update shipping details or check order status via your history page."
     },
     zh: {
-      name: "🔑 高段位 Valorant 账号（含稀有高级近战武器）",
-      description: "Diamond（钻石）段位账号，含 2022+2023 年热门冠军近战皮肤及高级枪械皮肤，即时交付，30 天保障！",
-      details: "### 账号属性\n- 当前段位: **Diamond 2 (钻石 2)**\n- 近战皮肤: **Champions 2022 蝴蝶刀** 或 **Champions 2023 狂徒**\n- 包含热门狂徒皮肤: Prime, Reaver, RGX\n- 购买后可立即修改密码和绑定邮箱\n- 交付首月内防回、防回收，提供 30 天无理由售后保障\n\n*请录制从付款至登录成功的完整视频以维护您的售后权益。*"
+      name: "草药疗法",
+      description: "有益健康的民间智慧。",
+      details: "相关益处包括参与年度“卡廷”（Kathin）仪式，以及支持小规模可持续生计。
+采用环保天然材料包装，以减少塑料废弃物。
+可通过订单记录页面轻松更新配送信息或查询订单状态。"
     }
   },
   "prod-2": {
