@@ -480,17 +480,13 @@ export const productTranslations = {
     en: {
       name: "Herbal Medicine",
       description: "Folk wisdom for your good health.",
-      details: "Local wisdom for your well-being.
-Benefits include participation in the annual Kathin ceremony and support for small-scale sustainable livelihoods.
-Eco-friendly packaging using natural materials to reduce plastic waste.
+      details: "Local wisdom for your well-being.Benefits include participation in the annual Kathin ceremony and support for small-scale sustainable livelihoods.Eco-friendly packaging using natural materials to reduce plastic waste.
 Easily update shipping details or check order status via your history page."
     },
     zh: {
       name: "草药疗法",
       description: "有益健康的民间智慧。",
-      details: "相关益处包括参与年度“卡廷”（Kathin）仪式，以及支持小规模可持续生计。
-采用环保天然材料包装，以减少塑料废弃物。
-可通过订单记录页面轻松更新配送信息或查询订单状态。"
+      details: "相关益处包括参与年度“卡廷”（Kathin）仪式，以及支持小规模可持续生计。采用环保天然材料包装，以减少塑料废弃物。可通过订单记录页面轻松更新配送信息或查询订单状态。"
     }
   },
   "prod-2": {
