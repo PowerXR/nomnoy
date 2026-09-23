@@ -7,7 +7,8 @@ import { AppSettings, Category, Product, User, Coupon, Transaction, Review, BoxI
 import { loadFromPrisma, saveToPrisma } from "./src/lib/prisma-sync";
 import "dotenv/config";
 import { createClient } from "@supabase/supabase-js";
-import { createHmac, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, randomUUID, scrypt, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
 
 
 const supabaseStorage = createClient(
@@ -25,7 +26,7 @@ const supabaseStorage = createClient(
 // Database storage setup
 const DB_FILE = path.join(process.cwd(), "db.json");
 const SESSION_SECRET =
-  process.env.SESSION_SECRET || "change-this-secret-before-production";
+  process.env.SESSION_SECRET || randomBytes(32).toString("hex");
 
 const SESSION_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 
@@ -95,6 +96,38 @@ function getBearerToken(authorization: string | undefined) {
 function toPublicUser(user: any) {
   const { password: _password, ...safeUser } = user;
   return safeUser;
+}
+
+function setSessionCookie(res: express.Response, token: string) {
+  res.cookie("session", token, {
+    httpOnly: true,
+    sameSite: "strict",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: SESSION_MAX_AGE_MS
+  });
+}
+
+// Passwords are stored as salted scrypt hashes; never return the hash to clients.
+const derivePasswordKey = promisify(scrypt);
+const PASSWORD_COST = 1 << 17;
+const PASSWORD_OPTIONS = { N: PASSWORD_COST, r: 8, p: 1, maxmem: 256 * 1024 * 1024 };
+
+async function hashPassword(password: string): Promise<string> {
+  const salt = randomBytes(16).toString("hex");
+  const key = await derivePasswordKey(password, salt, 64, PASSWORD_OPTIONS) as Buffer;
+  return `scrypt$${PASSWORD_COST}$${salt}$${key.toString("hex")}`;
+}
+
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const [algorithm, cost, salt, hash] = stored.split("$");
+  if (algorithm !== "scrypt" || cost !== String(PASSWORD_COST) ||
+      !/^[0-9a-f]{32}$/i.test(salt || "") || !/^[0-9a-f]{128}$/i.test(hash || "")) {
+    return false;
+  }
+  const expected = Buffer.from(hash, "hex");
+  const actual = await derivePasswordKey(password, salt, expected.length, PASSWORD_OPTIONS) as Buffer;
+  return timingSafeEqual(actual, expected);
 }
 
 // Helper to load DB
@@ -341,6 +374,18 @@ async function startServer() {
   // Initial local copy of dynamic DB
   let db = await loadDB();
 
+  // One-time migration for existing plaintext passwords. Back up the database
+  // before deploying; users keep their current password during migration.
+  let migratedPasswords = false;
+  for (const account of db.users || []) {
+    if (typeof account.password === "string" && account.password &&
+        !account.password.startsWith("scrypt$")) {
+      account.password = await hashPassword(account.password);
+      migratedPasswords = true;
+    }
+  }
+  if (migratedPasswords) await saveToPrisma(db);
+
   // Real-time SSE Clients for live purchase notifications
   let sseClients: any[] = [];
 
@@ -416,9 +461,12 @@ async function startServer() {
 
   // ตรวจสอบผู้ใช้จาก Token
   const getAuthenticatedUser = (req: any) => {
-    const token = getBearerToken(
-      req.headers.authorization as string | undefined
-    );
+    const cookieToken = String(req.headers.cookie || "")
+      .split(";")
+      .map((part: string) => part.trim())
+      .find((part: string) => part.startsWith("session="))
+      ?.slice("session=".length);
+    const token = getBearerToken(req.headers.authorization as string | undefined) || cookieToken;
 
     const session = readSessionToken(token);
 
@@ -430,6 +478,8 @@ async function startServer() {
       ) || null
     );
   };
+
+  const isAdmin = (req: any) => getAuthenticatedUser(req)?.role === "admin";
 
   // ดึงรหัสสินค้าทั้งหมดออกจากรายการสั่งซื้อ
   const getTransactionProductIds = (tx: any): string[] => {
@@ -758,17 +808,15 @@ async function startServer() {
 
   // Get Full DB Backup (Admin only)
   app.get("/api/admin/backup", (req, res) => {
-    const adminCheck = req.headers["x-user-role"];
-    if (adminCheck !== "admin") {
+    if (!isAdmin(req)) {
       return res.status(403).json({ error: "Unauthorized access" });
     }
-    res.json(db);
+    res.json({ ...db, users: db.users.map(toPublicUser) });
   });
 
   // Restore DB Backup (Admin only)
   app.post("/api/admin/restore", (req, res) => {
-    const adminCheck = req.headers["x-user-role"];
-    if (adminCheck !== "admin") {
+    if (!isAdmin(req)) {
       return res.status(403).json({ error: "Unauthorized access" });
     }
     const backupData = req.body;
@@ -783,7 +831,9 @@ async function startServer() {
     // Merge or overwrite database
     db = {
       ...db,
-      ...backupData
+      ...backupData,
+      // Backups deliberately omit credentials; keep existing accounts and hashes.
+      users: db.users
     };
     saveDB(db);
 
@@ -919,32 +969,34 @@ async function startServer() {
 
   // Get All Users
   app.get("/api/users", (req, res) => {
-    const adminCheck = req.headers["x-user-role"];
-    if (adminCheck !== "admin") return res.status(403).json({ error: "Unauthorized" });
-    res.json(db.users);
+    if (!isAdmin(req)) return res.status(403).json({ error: "Unauthorized" });
+    res.json(db.users.map(toPublicUser));
   });
 
   // Update User balance/role (Admin)
   app.put("/api/users/:id", (req, res) => {
-    const adminCheck = req.headers["x-user-role"];
-    if (adminCheck !== "admin") return res.status(403).json({ error: "Unauthorized" });
+    if (!isAdmin(req)) return res.status(403).json({ error: "Unauthorized" });
 
     const index = db.users.findIndex((u: any) => u.id === req.params.id);
     if (index === -1) return res.status(404).json({ error: "User not found" });
 
+    // Only editable profile fields are accepted here. Password changes use
+    // the dedicated password flow with verification.
+    const { username, email, role, balance } = req.body;
     db.users[index] = {
       ...db.users[index],
-      ...req.body,
-      balance: req.body.balance !== undefined ? Number(req.body.balance) : db.users[index].balance
+      ...(username !== undefined ? { username } : {}),
+      ...(email !== undefined ? { email } : {}),
+      ...(role !== undefined ? { role } : {}),
+      ...(balance !== undefined ? { balance: Number(balance) } : {})
     };
     saveDB(db);
-    res.json(db.users[index]);
+    res.json(toPublicUser(db.users[index]));
   });
 
   // Delete User (Admin)
   app.delete("/api/users/:id", (req, res) => {
-    const adminCheck = req.headers["x-user-role"];
-    if (adminCheck !== "admin") return res.status(403).json({ error: "Unauthorized" });
+    if (!isAdmin(req)) return res.status(403).json({ error: "Unauthorized" });
 
     if (req.params.id === "usr-admin") {
       return res.status(400).json({ error: "ไม่สามารถลบผู้ดูแลระบบหลักได้" });
@@ -959,14 +1011,15 @@ async function startServer() {
   });
 
   // Create User (Admin / normal register)
-  app.post("/api/users/register", (req, res) => {
+  app.post("/api/users/register", async (req, res) => {
     const { username, email, password } =
       req.body;
 
-    if (!username || !email) {
+    if (typeof username !== "string" || !username.trim() ||
+        typeof email !== "string" || !email.trim() ||
+        typeof password !== "string" || password.length < 8) {
       return res.status(400).json({
-        error:
-          "Username and email are required",
+        error: "กรุณาระบุชื่อผู้ใช้ อีเมล และรหัสผ่านอย่างน้อย 8 ตัวอักษร",
       });
     }
 
@@ -991,23 +1044,30 @@ async function startServer() {
       email,
       balance: 0,
       role: "user",
-      password: password || "123456",
+      password: await hashPassword(password),
     };
 
     db.users.push(newUser);
     saveDB(db);
 
+    const token = createSessionToken(newUser.id);
+    // Admins can create a member without switching their own browser session.
+    if (!isAdmin(req)) setSessionCookie(res, token);
+
     res.status(201).json({
       ...toPublicUser(newUser),
-      authToken:
-        createSessionToken(newUser.id),
+      authToken: token,
     });
   });
 
   // Login User
-  app.post("/api/users/login", (req, res) => {
+  app.post("/api/users/login", async (req, res) => {
     const { username, password } =
       req.body;
+
+    if (typeof username !== "string" || typeof password !== "string") {
+      return res.status(401).json({ error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
+    }
 
     const user = db.users.find(
       (u: any) =>
@@ -1022,32 +1082,15 @@ async function startServer() {
       });
     }
 
-    if (user.password && password) {
-      if (user.role === "admin") {
-        if (
-          password !== user.password &&
-          password !== "admin" &&
-          password !== "123456"
-        ) {
-          return res.status(401).json({
-            error:
-              "รหัสผ่านสำหรับแอดมินไม่ถูกต้อง กรุณาระบุรหัสผ่านที่ถูกต้อง",
-          });
-        }
-      } else if (
-        user.password !== password
-      ) {
-        return res.status(401).json({
-          error:
-            "รหัสผ่านไม่ถูกต้อง กรุณาระบุรหัสผ่านที่ถูกต้องค่ะ",
-        });
-      }
+    if (!user.password || !await verifyPassword(password, user.password)) {
+      return res.status(401).json({ error: "ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง" });
     }
 
+    const token = createSessionToken(user.id);
+    setSessionCookie(res, token);
     res.json({
       ...toPublicUser(user),
-      authToken:
-        createSessionToken(user.id),
+      authToken: token,
     });
   });
 
@@ -1098,10 +1141,12 @@ async function startServer() {
 
       saveDB(db);
 
+      const token = createSessionToken(user.id);
+      setSessionCookie(res, token);
+
       res.json({
         ...toPublicUser(user),
-        authToken:
-          createSessionToken(user.id),
+        authToken: token,
       });
     }
   );
@@ -1136,8 +1181,8 @@ async function startServer() {
   });
 
   // Update Current User Profile (For all roles)
-  app.post("/api/users/profile/update", (req, res) => {
-    const userId = req.headers["x-user-id"] as string;
+  app.post("/api/users/profile/update", async (req, res) => {
+    const userId = getAuthenticatedUser(req)?.id;
     if (!userId) {
       return res.status(401).json({ error: "กรุณาเข้าสู่ระบบก่อนทำรายการ" });
     }
@@ -1173,15 +1218,22 @@ async function startServer() {
 
     // Handle Password Change
     if (newPassword) {
+      if (getAuthenticatedUser(req)?.id !== userId) {
+        return res.status(401).json({ error: "กรุณาเข้าสู่ระบบใหม่เพื่อเปลี่ยนรหัสผ่าน" });
+      }
+      if (typeof newPassword !== "string" || newPassword.length < 8) {
+        return res.status(400).json({ error: "รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร" });
+      }
       // If user has an existing password, they must provide the correct current password
-      if (user.password && user.password !== currentPassword) {
+      if (user.password && (typeof currentPassword !== "string" ||
+          !await verifyPassword(currentPassword, user.password))) {
         return res.status(400).json({ error: "รหัสผ่านปัจจุบันไม่ถูกต้อง" });
       }
-      user.password = newPassword;
+      user.password = await hashPassword(newPassword);
     }
 
     saveDB(db);
-    res.json({ message: "อัปเดตโปรไฟล์สำเร็จ", user });
+    res.json({ message: "อัปเดตโปรไฟล์สำเร็จ", user: toPublicUser(user) });
   });
 
   // Buy Product or Roll Box API
@@ -3995,7 +4047,7 @@ app.post("/api/chat/admin-support", (req, res) => {
 
     saveDB(db);
     broadcastChatEvent({ type: "user_moderated", userId: targetUserId, action });
-    res.json({ success: true, user: target });
+    res.json({ success: true, user: toPublicUser(target) });
   });
 
   // --- VITE MIDDLEWARE ---
