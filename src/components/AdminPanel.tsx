@@ -7,6 +7,8 @@ import {
 } from "lucide-react";
 import { motion } from "motion/react";
 
+type AdminUser = Pick<User, "id" | "username" | "email" | "avatarUrl" | "role" | "balance">;
+
 // กำหนดชนิดข้อมูล (Props) ที่คอมโพเนนต์อัปโหลดรูปภาพต้องได้รับ
 interface ImageUploaderProps {
   label?: string;
@@ -186,7 +188,7 @@ export default function AdminPanel({
   };
 
   // สถานะสำหรับแสดง เพิ่ม และแก้ไขข้อมูลผู้ใช้งาน
-  const [usersList, setUsersList] = useState<User[]>([]);
+  const [usersList, setUsersList] = useState<AdminUser[]>([]);
   const [userListLoading, setUserListLoading] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
@@ -443,7 +445,15 @@ export default function AdminPanel({
       if (text && !text.trim().startsWith("<")) {
         const data = JSON.parse(text);
         if (Array.isArray(data)) {
-          setUsersList(data);
+          // เก็บเฉพาะข้อมูลที่จำเป็นสำหรับตาราง ห้ามเก็บรหัสผ่านใน state
+          setUsersList(data.map((u: User): AdminUser => ({
+            id: u.id,
+            username: u.username,
+            email: u.email,
+            avatarUrl: u.avatarUrl,
+            role: u.role,
+            balance: u.balance
+          })));
         }
       }
     } catch (err) {
@@ -500,7 +510,6 @@ export default function AdminPanel({
       const bodyData = isEditing ? {
         username: userForm.username,
         email: userForm.email,
-        password: userForm.password,
         role: userForm.role,
         balance: Number(userForm.balance)
       } : {
@@ -536,13 +545,13 @@ export default function AdminPanel({
     }
   };
 
-  const handleStartEditUser = (u: User) => {
+  const handleStartEditUser = (u: AdminUser) => {
     // นำข้อมูลผู้ใช้ที่เลือกมาใส่ในแบบฟอร์มเพื่อเริ่มแก้ไข
     setEditingUserId(u.id);
     setUserForm({
       username: u.username,
       email: u.email,
-      password: u.password || "123456",
+      password: "",
       role: u.role,
       balance: u.balance
     });
@@ -1654,17 +1663,19 @@ export default function AdminPanel({
                           className="w-full bg-slate-900 border border-white/10 rounded-lg p-2 text-white" 
                         />
                       </div>
-                      <div>
+                      {!editingUserId && <div>
                         <label className="block mb-1 text-[10px] text-stone-400 font-bold text-amber-300">รหัสผ่าน (Password)*</label>
                         <input 
-                          type="text" 
+                          type="password"
+                          minLength={8}
+                          autoComplete="new-password"
                           required 
                           value={userForm.password} 
                           onChange={e => setUserForm({...userForm, password: e.target.value})} 
                           placeholder="รหัสผ่านเข้าสู่ระบบ"
                           className="w-full bg-slate-900 border border-amber-500/30 rounded-lg p-2 text-amber-200 font-mono" 
                         />
-                      </div>
+                      </div>}
 
                       {/* ตัวเลือกบทบาท จะแสดงเมื่ออยู่ในเงื่อนไขที่อนุญาต */}
                       <div>
@@ -1725,7 +1736,6 @@ export default function AdminPanel({
                         <tr>
                           <th className="p-3">รหัสผู้ใช้ (User ID)</th>
                           <th className="p-3">ผู้ใช้งาน (Username) / อีเมล</th>
-                          <th className="p-3">รหัสผ่าน (Password)</th>
                           <th className="p-3 text-center">บทบาท</th>
                           <th className="p-3 text-right">ยอดเครดิตในระบบ</th>
                           <th className="p-3 text-center">การจัดการ</th>
@@ -1743,11 +1753,6 @@ export default function AdminPanel({
                                 <span>{u.username}</span>
                               </div>
                               <span className="text-[10px] text-slate-400 block break-all">{u.email}</span>
-                            </td>
-                            <td className="p-3">
-                              <span className="p-1 font-mono font-bold text-amber-300 bg-amber-500/5 px-2 py-0.5 rounded border border-amber-300/10">
-                                {u.password || <span className="text-slate-500 text-[10px] italic">ไม่มี (เข้าด้วย Discord)</span>}
-                              </span>
                             </td>
                             <td className="p-3 text-center">
                               {u.role === "admin" ? (
